@@ -541,4 +541,44 @@ describe('mcp/code text style', () => {
     expect(inferFontWeight('Book', undefined)).toBeUndefined()
     expect(inferFontWeight(undefined, undefined)).toBeUndefined()
   })
+
+  it('outputs text-decoration-color from RGB value', () => {
+    const segment = createSegment({
+      textDecoration: 'UNDERLINE',
+      textDecorationColor: { r: 0, g: 0.4, b: 1 }
+    })
+
+    const attrs = resolveRunAttrs(segment as never, {}, [])
+
+    expect(attrs['text-decoration-line']).toBe('underline')
+    expect(attrs['text-decoration-color']).toBe('#06F')
+  })
+
+  it('outputs text-decoration-color from SolidPaint value', () => {
+    const segment = createSegment({
+      textDecoration: 'UNDERLINE',
+      textDecorationColor: {
+        value: {
+          type: 'SOLID',
+          color: { r: 1, g: 0, b: 0 },
+          opacity: 0.5
+        }
+      }
+    })
+
+    const attrs = resolveRunAttrs(segment as never, {}, [])
+
+    expect(attrs['text-decoration-color']).toBe('#FF000080')
+  })
+
+  it('omits text-decoration-color when not set', () => {
+    const segment = createSegment({
+      textDecoration: 'UNDERLINE'
+    })
+
+    const attrs = resolveRunAttrs(segment as never, {}, [])
+
+    expect(attrs['text-decoration-line']).toBe('underline')
+    expect(attrs['text-decoration-color']).toBeUndefined()
+  })
 })

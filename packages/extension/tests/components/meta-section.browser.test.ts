@@ -7,6 +7,8 @@ import { selection, selectionRevision } from '@/ui/state'
 
 import { mount, unmountAll } from './mount'
 
+import '@/entrypoints/ui/style.css'
+
 const show = vi.hoisted(() => vi.fn())
 vi.mock('@/composables', async () => ({
   ...(await import('@/composables/dev-resources')),
@@ -20,6 +22,10 @@ vi.mock('@/ui/state', async () => {
   return {
     selection,
     selectionRevision,
+    figmaSelection: selection,
+    activeFocusId: shallowRef(null),
+    activeFocusNode: computed(() => selection.value[0] ?? null),
+    pinFromFigmaSelection: () => ({ ok: false, reason: 'empty' }),
     selectedNode: computed(() => selection.value[0] ?? null),
     selectedTemPadComponent: computed(() => {
       void selectionRevision.value
@@ -75,7 +81,7 @@ it('updates the title and copied name when the same ordinary layer is renamed', 
 it('refreshes empty, changed, and deleted links without changing selection', async () => {
   const read = vi.fn<() => Promise<Resource[]>>().mockResolvedValue([])
   selection.value = [node(read)]
-  mount(MetaSection)
+  mount(MetaSection, { tag: 'tempad' })
   await expect.poll(() => read.mock.calls.length).toBe(1)
   const refresh = page.getByRole('button', { name: 'Refresh links' })
   await expect.element(refresh).toBeVisible()
@@ -96,7 +102,7 @@ it('shares pending reads, retains links on failure, and permits retry', async ()
   const initial = deferred()
   const read = vi.fn<() => Promise<Resource[]>>().mockReturnValueOnce(initial.promise)
   selection.value = [node(read)]
-  mount(MetaSection)
+  mount(MetaSection, { tag: 'tempad' })
   const refresh = page.getByRole('button', { name: 'Refresh links' })
   await refresh.click()
   await expect.element(refresh).toBeDisabled()
@@ -121,7 +127,7 @@ it('keeps an old node response separate from the current node refresh', async ()
     .mockResolvedValueOnce([])
     .mockReturnValue(old.promise)
   selection.value = [node(readOld)]
-  mount(MetaSection)
+  mount(MetaSection, { tag: 'tempad' })
   await expect.poll(() => readOld.mock.calls.length).toBe(1)
   const refresh = page.getByRole('button', { name: 'Refresh links' })
   await refresh.click()

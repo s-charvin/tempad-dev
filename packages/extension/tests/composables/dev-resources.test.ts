@@ -3,9 +3,15 @@ import { computed, effectScope, nextTick, ref, shallowRef } from 'vue'
 
 vi.mock('@/ui/state', async () => {
   const { shallowRef } = await import('vue')
+  const selection = shallowRef<readonly SceneNode[]>([])
   return {
-    selection: shallowRef<readonly SceneNode[]>([]),
     selectionRevision: shallowRef(0),
+    activeFocusNode: shallowRef<SceneNode | null>(null),
+    workingNodes: shallowRef<SceneNode[]>([]),
+    selection,
+    figmaSelection: selection,
+    loadWorkingSetFromStorage: vi.fn(),
+    rehydrateWorkingSet: vi.fn(),
     layoutReady: shallowRef(false),
     runtimeMode: shallowRef('standard')
   }

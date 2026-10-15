@@ -3,14 +3,30 @@ import Badge from '@/components/Badge.vue'
 import Copyable from '@/components/Copyable.vue'
 import IconButton from '@/components/IconButton.vue'
 import Link from '@/components/icons/Link.vue'
+import Plus from '@/components/icons/Plus.vue'
 import Refresh from '@/components/icons/Refresh.vue'
 import Select from '@/components/icons/Select.vue'
 import Section from '@/components/Section.vue'
 import { refreshDevResourceLinks, useDevResourceLinks, useToast } from '@/composables'
-import { selection, selectionRevision, selectedNode, selectedTemPadComponent } from '@/ui/state'
+import {
+  activeFocusId,
+  activeFocusNode,
+  figmaSelection,
+  pinFromFigmaSelection,
+  selection,
+  selectionRevision,
+  selectedTemPadComponent
+} from '@/ui/state'
+
+const { show } = useToast()
 
 const title = computed(() => {
   void selectionRevision.value
+  const focusedNode = activeFocusId.value ? activeFocusNode.value : null
+  if (focusedNode) {
+    return selectedTemPadComponent.value?.name ?? focusedNode.name
+  }
+
   const nodes = selection.value
   const [node] = nodes
 
@@ -30,25 +46,24 @@ const title = computed(() => {
   return node.name
 })
 
-const showFocusButton = computed(
-  () => selection.value && selection.value.length > 0 && window.figma
-)
+const showFocusButton = computed(() => !!activeFocusNode.value && !!window.figma)
 
-const devResourceLinks = useDevResourceLinks(selectedNode)
+const canPin = computed(() => figmaSelection.value.some((node) => node.visible))
+
+const devResourceLinks = useDevResourceLinks(activeFocusNode)
 const refreshingNode = shallowRef<SceneNode | null>(null)
 const refreshing = computed(
-  () => !!selectedNode.value && refreshingNode.value === selectedNode.value
+  () => !!activeFocusNode.value && refreshingNode.value === activeFocusNode.value
 )
-const { show } = useToast()
 
 async function refreshLinks() {
-  const node = selectedNode.value
+  const node = activeFocusNode.value
   if (!node || refreshing.value) return
   refreshingNode.value = node
   try {
     await refreshDevResourceLinks(node)
   } catch {
-    if (selectedNode.value === node) show('Could not refresh links. Try again.')
+    if (activeFocusNode.value === node) show('Could not refresh links. Try again.')
   } finally {
     if (refreshingNode.value === node) refreshingNode.value = null
   }
@@ -59,10 +74,24 @@ const libDisplayName = computed(() => selectedTemPadComponent.value?.libDisplayN
 const libName = computed(() => selectedTemPadComponent.value?.libName)
 
 function scrollIntoView() {
-  if (!window?.figma || selection.value.length === 0) {
+  const node = activeFocusNode.value
+  if (!window?.figma || !node) {
     return
   }
-  window.figma.viewport.scrollAndZoomIntoView(selection.value)
+  window.figma.viewport.scrollAndZoomIntoView([node])
+}
+
+function pinSelection() {
+  const result = pinFromFigmaSelection()
+  if (result.ok) {
+    show(result.added === 1 ? 'Pinned 1 layer' : `Pinned ${result.added} layers`)
+    return
+  }
+  if (result.reason === 'empty') {
+    show('Select a visible layer to pin')
+    return
+  }
+  show('TemPad is not ready')
 }
 </script>
 
@@ -81,10 +110,13 @@ function scrollIntoView() {
           <Badge :title="libName">{{ libDisplayName || libName }}</Badge>
         </Copyable>
       </div>
-      <span class="tp-meta-title-aux tp-ellipsis" v-else>No selection</span>
-      <div v-if="selectedNode || showFocusButton" class="tp-row">
+      <span class="tp-meta-title-aux tp-ellipsis" v-else>No focus</span>
+      <div class="tp-row tp-gap-l">
+        <IconButton title="Pin current Figma selection" :disabled="!canPin" @click="pinSelection">
+          <Plus />
+        </IconButton>
         <IconButton
-          v-if="selectedNode"
+          v-if="activeFocusNode"
           title="Refresh links"
           :disabled="refreshing"
           @click="refreshLinks"

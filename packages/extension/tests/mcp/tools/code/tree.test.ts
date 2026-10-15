@@ -268,6 +268,15 @@ describe('mcp/tools/code/tree', () => {
     expect(tree.nodes.get('vector-1')?.assetKind).toBe('vector')
   })
 
+  it('adds a data hint for Figma mask nodes', () => {
+    vi.mocked(suggestDepthLimit).mockReturnValue(undefined)
+
+    const mask = createNode('VECTOR', 'mask-1', { isMask: true })
+    const tree = buildVisibleTree([mask])
+
+    expect(tree.nodes.get('mask-1')?.dataHint).toEqual({ 'data-hint-mask': 'true' })
+  })
+
   it('caps traversal at depth limit', () => {
     vi.mocked(suggestDepthLimit).mockReturnValue(1)
     ;(globalThis as unknown as { figma: PluginAPI }).figma = {

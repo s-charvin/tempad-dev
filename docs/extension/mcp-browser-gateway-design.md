@@ -67,7 +67,8 @@ in compatibility fixtures. A version bump alone does not complete a migration.
 
 ### Protocol 13 transition
 
-The Hub serves both released protocol 13 (extension 0.22.0) and protocol 15 (extension 0.23.0).
+The Hub serves released protocol 13 (extension 0.22.0), protocol 15 (extension 0.23.0), and
+current protocol 16, which adds explicit Figma-native `get_screenshot.scale` export multipliers.
 Current extensions include `protocolVersion` in `runtimeHello`; a missing field conservatively
 selects protocol 13. Package versions and runtime fingerprints do not select capabilities.
 An unsupported version or a changed runtime identity/protocol on an open connection closes it.
@@ -81,8 +82,14 @@ Read responses explicitly identify older selection and token semantics; the Hub 
 alias dependencies nor claims consumer-aware token resolution. Exact `nodeId` reads remain the
 continuation path. Compatibility notices count toward the same inline response budget.
 
-`pnpm mcp:check-bridge` exercises the built Hub against frozen extension 0.22.0 schemas alongside
-current and unversioned peers, covering reads, tasks, writes, assets, reconnects, and routing fences.
+Explicit `get_screenshot.scale` requests require protocol 16. The Hub rejects them before dispatch
+to protocol 13, protocol 15, and unversioned peers with `EXTENSION_UPGRADE_REQUIRED`, including
+explicit `scale: 1`. It never silently strips a multiplier and returns an automatically sized PNG.
+Calls that omit `scale` keep their released behavior on those peers.
+
+`pnpm mcp:check-bridge` exercises the built Hub against frozen extension 0.22.0 schemas and protocol
+15 screenshot arguments alongside current and unversioned peers, covering reads, tasks, writes,
+assets, reconnects, multiplier rejection, and routing fences.
 Keep protocol 13 for at least one store cycle; removal requires a separate migration decision.
 
 Runtime identities record the observed builds; changed source fingerprints, versions,

@@ -342,7 +342,14 @@ describe('extension socket lifecycle', () => {
     expect(onSessions).toHaveBeenCalledOnce()
     expect(registry.list().find(({ id }) => id === 'attacker')?.sessions).toBeUndefined()
   })
-  it.each([undefined, 13, 15, 14, 16])(
+  it.each([
+    undefined,
+    13,
+    15,
+    14,
+    TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION,
+    TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION + 1
+  ])(
     'binds supported runtime protocol %s and closes unsupported peers',
     async (protocolVersion) => {
       const registry = new ExtensionRegistry(10_000)
@@ -379,7 +386,7 @@ describe('extension socket lifecycle', () => {
         extensionRuntimeFingerprint: 'a'.repeat(64)
       }
       client.send(JSON.stringify(hello))
-      if (protocolVersion === 14 || protocolVersion === 16) {
+      if (protocolVersion === 14 || protocolVersion === TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION + 1) {
         await waitUntil(() => client.readyState === WebSocket.CLOSED)
         expect(onRuntimeHello).not.toHaveBeenCalled()
         return

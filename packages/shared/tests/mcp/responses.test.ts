@@ -102,13 +102,13 @@ describe('mcp/responses helpers', () => {
     expect(buildGetTokenDefsToolResult({}).content?.[0]?.text).toContain('No token definitions')
   })
 
-  it('measures CallToolResult bytes beyond the bare text payload', () => {
+  it('measures CallToolResult bytes from the serialized response body', () => {
     const result: ToolResponseLike = {
-      content: [{ type: 'text', text: 'hello' }],
-      structuredContent: { code: 'hello' }
+      content: [{ type: 'text', text: 'hello' }]
     }
 
     expect(measureCallToolResultBytes(result)).toBeGreaterThan(utf8Bytes('hello'))
+    expect(measureCallToolResultBytes(result)).toBeLessThan(utf8Bytes('hello') * 10)
   })
 
   it('builds code tool summaries from warning messages', () => {
@@ -149,13 +149,40 @@ describe('mcp/responses helpers', () => {
     expect(result.content?.[0]?.text).not.toContain('Next: call get_code with')
   })
 
+  it('builds node-batch get_code results with per-node status', () => {
+    const payload: ToolResultMap['get_code'] = {
+      results: [
+        {
+          nodeId: '1:1',
+          result: {
+            code: '<a/>',
+            lang: 'jsx',
+            codegen: { plugin: 'builtin', config: { cssUnit: 'px', rootFontSize: 16, scale: 1 } }
+          }
+        },
+        {
+          nodeId: '2:2',
+          error: { code: 'EXTENSION_TIMEOUT', message: 'failed' }
+        }
+      ],
+      remainingNodeIds: ['3:3']
+    }
+    const result = buildGetCodeToolResult(payload)
+    const text = result.content?.map((block) => block.text).join('\n') ?? ''
+
+    expect(result.structuredContent).toEqual(payload)
+    expect(text).toContain('Returned 1 node result(s), 1 failure(s).')
+    expect(text).toContain('Node 1:1')
+    expect(text).toContain('Node 2:2: [EXTENSION_TIMEOUT] failed')
+    expect(text).toContain('pass remainingNodeIds as nodeIds')
+  })
+
   it('builds structure and token tool summaries with structured content', () => {
-    const structure = buildGetStructureToolResult({
+    const structurePayload = {
       roots: [{ id: '1', name: 'Root', type: 'FRAME', x: 0, y: 0, width: 10, height: 10 }]
-    })
-    expect(structure.structuredContent).toEqual({
-      roots: [{ id: '1', name: 'Root', type: 'FRAME', x: 0, y: 0, width: 10, height: 10 }]
-    })
+    }
+    const structure = buildGetStructureToolResult(structurePayload)
+    expect(structure.structuredContent).toEqual(structurePayload)
     expect(structure.content?.[0]?.text).toContain('Returned structure outline')
 
     const truncated = buildGetStructureToolResult({

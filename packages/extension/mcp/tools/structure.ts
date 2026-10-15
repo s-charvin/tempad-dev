@@ -100,6 +100,7 @@ function compactByNodeLimit(
       if (node.children?.length) queue.push({ nodes: node.children, parent: compact })
     }
   }
+
   return compactRoots
 }
 

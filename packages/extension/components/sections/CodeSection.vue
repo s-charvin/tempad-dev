@@ -15,7 +15,8 @@ import {
   selectedNode,
   options,
   selectedTemPadComponent,
-  activePlugin
+  activePlugin,
+  workingNodes
 } from '@/ui/state'
 import { generateCodeBlocksForNode } from '@/utils/codegen'
 
@@ -52,7 +53,8 @@ async function updateCode() {
   const current = ++generation
   const input = generationInput.value
   const node = input.node
-  const retainCode = node !== null && input === contentInput && selection.value.length === 1
+  const canGenerate = selection.value.length <= 1 || workingNodes.value.length > 0
+  const retainCode = node !== null && input === contentInput && canGenerate
   clearTimeout(loadingTimer)
   showLoading.value = false
   loadingHeight.value = content.value?.getBoundingClientRect().height ?? 0
@@ -65,7 +67,7 @@ async function updateCode() {
   }
   codeError.value = ''
 
-  if (node == null || selection.value.length > 1) return
+  if (node == null || !canGenerate) return
   if (!retainCode) {
     loading.value = true
     loadingTimer = setTimeout(() => (showLoading.value = true), 150)
@@ -112,7 +114,13 @@ async function updateCode() {
   }
 }
 
-watch([selection, selectionRevision, generationInput], updateCode, { immediate: true })
+watch(
+  [selection, selectionRevision, generationInput, () => workingNodes.value.length > 0],
+  updateCode,
+  {
+    immediate: true
+  }
+)
 onBeforeUnmount(() => {
   generation++
   clearTimeout(loadingTimer)

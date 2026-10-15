@@ -4,12 +4,25 @@ import { getRecordProperty } from './shared'
 
 const NODE_READS = new Set(['get_code', 'get_screenshot', 'get_structure'])
 
-/** Preserve protocol 13's wire arguments; never silently strip a newer read option. */
+/** Preserve released wire arguments; never silently strip a newer read option. */
 export function assertVersionedToolSupport(
   protocolVersion: number,
   name: string,
   args: unknown
 ): void {
+  if (
+    protocolVersion < 16 &&
+    name === 'get_screenshot' &&
+    getRecordProperty(args, 'scale') !== undefined
+  ) {
+    throw Object.assign(
+      new Error(
+        'Explicit screenshot export scale requires an updated TemPad Dev extension. Update the ' +
+          'extension and reload the Figma tab. Until then, omit scale for automatic screenshot sizing.'
+      ),
+      { code: TEMPAD_MCP_ERROR_CODES.EXTENSION_UPGRADE_REQUIRED }
+    )
+  }
   if (protocolVersion !== 13) return
   const unsupported =
     (NODE_READS.has(name) && getRecordProperty(args, 'nodeIds') !== undefined) ||

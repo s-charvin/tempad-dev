@@ -2458,6 +2458,27 @@ describe('mcp/tools canvas authoring result schemas', () => {
 })
 
 describe('mcp/tools parameter schemas', () => {
+  it.each([0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4])(
+    'preserves the explicit screenshot export multiplier %s',
+    (scale) => {
+      expect(GetScreenshotParametersSchema.parse({ nodeId: '1:2', scale })).toEqual({
+        nodeId: '1:2',
+        scale
+      })
+      expect(GetScreenshotParametersSchema.parse({ nodeIds: ['1:2', '1:3'], scale })).toEqual({
+        nodeIds: ['1:2', '1:3'],
+        scale
+      })
+    }
+  )
+
+  it.each([0, -1, NaN, Infinity, -Infinity, '3'])(
+    'rejects invalid screenshot export multiplier %s',
+    (scale) => {
+      expect(GetScreenshotParametersSchema.safeParse({ scale }).success).toBe(false)
+    }
+  )
+
   it.each([GetCodeParametersSchema, GetScreenshotParametersSchema, GetStructureParametersSchema])(
     'accepts exact node sets and rejects ambiguous or empty targets',
     (schema) => {

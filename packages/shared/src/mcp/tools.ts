@@ -150,6 +150,32 @@ export type GetCodeResult = {
 }
 export type GetCodeReadResult = GetCodeResult | NodeReadBatchResult<GetCodeResult>
 
+/** Multi-pin get_code envelope. Discriminate with `batch === true`. */
+export type GetCodeBatchItemError = {
+  code: string
+  message: string
+}
+
+export type GetCodeBatchItem = {
+  nodeId: string
+  name: string
+  result?: GetCodeResult
+  error?: GetCodeBatchItemError
+}
+
+export type GetCodeBatchResult = {
+  batch: true
+  items: GetCodeBatchItem[]
+}
+
+export type GetCodeToolPayload = GetCodeResult | GetCodeBatchResult
+
+export function isGetCodeBatchResult(payload: unknown): payload is GetCodeBatchResult {
+  if (!payload || typeof payload !== 'object') return false
+  const candidate = payload as Partial<GetCodeBatchResult>
+  return candidate.batch === true && Array.isArray(candidate.items)
+}
+
 // get_token_defs
 export const GetTokenDefsParametersSchema = z.object({
   taskId: DesignTaskParameterSchema,
@@ -186,7 +212,14 @@ export const GetScreenshotParametersSchema = z
     taskEpoch: DesignTaskEpochSchema,
     sessionId: ExactReadSessionParameterSchema,
     nodeId: NodeIdParameterSchema,
-    nodeIds: NodeIdsParameterSchema
+    nodeIds: NodeIdsParameterSchema,
+    scale: z
+      .number()
+      .positive()
+      .describe(
+        'Figma-native PNG export multiplier, e.g. 1, 2, or 3. An explicit value is used exactly and fails if the asset exceeds the upload limit; it is never automatically lowered. Omit to start at 1x and automatically reduce the scale if needed. Applies to every requested node; preserve it when continuing remainingNodeIds. Returned width/height are actual PNG pixels. This is independent of codegen.config.scale.'
+      )
+      .optional()
   })
   .superRefine(validateNodeTargets)
 

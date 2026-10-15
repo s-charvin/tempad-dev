@@ -26,6 +26,7 @@ interface AncestorCropSource extends CropSource {
 }
 
 interface ScreenshotRuntimeOptions {
+  scale?: number
   cropPng?: (bytes: Uint8Array, rect: PngCropRect) => Promise<Uint8Array>
 }
 
@@ -234,6 +235,9 @@ export async function handleGetScreenshot(
   node: SceneNode,
   options: ScreenshotRuntimeOptions = {}
 ): Promise<GetScreenshotResult> {
+  if (options.scale !== undefined && (!Number.isFinite(options.scale) || options.scale <= 0)) {
+    throw new Error('Screenshot scale must be a finite positive export multiplier.')
+  }
   const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
@@ -271,9 +275,10 @@ async function exportScreenshot(
         Math.sqrt(16_000_000 / (bounds.width * bounds.height))
       )
     : 1
-  for (const step of SCALE_STEPS) {
+  const scales =
+    options.scale === undefined ? SCALE_STEPS.map((step) => initialScale * step) : [options.scale]
+  for (const scale of scales) {
     signal.throwIfAborted()
-    const scale = initialScale * step
     const directBytes = await node.exportAsync({
       format: 'PNG',
       constraint: { type: 'SCALE', value: scale }
@@ -324,6 +329,12 @@ async function exportScreenshot(
     }
   }
 
+  if (options.scale !== undefined) {
+    throw new Error(
+      `Screenshot at the requested ${options.scale}x scale exceeds the asset upload limit. ` +
+        'Reduce selection size or explicitly request a lower scale; the requested scale was not lowered.'
+    )
+  }
   throw new Error(
     'Screenshot exceeds the asset upload limit at every supported scale. Reduce selection size and retry.'
   )

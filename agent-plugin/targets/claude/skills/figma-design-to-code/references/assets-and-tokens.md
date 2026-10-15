@@ -13,6 +13,13 @@ details.
   into the project's normal asset location. Never substitute a public internet
   asset.
 - Treat assets as files to store or reference, not text evidence to parse.
+- For a complete SVG composition, read the exact requested root with `get_code`
+  and use that root's matching asset entry. The exported asset includes its
+  composed vector children; do not select a nested child asset just because it
+  appears in the generated markup.
+- For a complete PNG composition, call `get_screenshot` for the exact requested
+  root. Use the returned `scale` when the tool reduces the export to fit its
+  transport limit.
 - If project policy forbids storing them, reference TemPad URLs only when the
   user accepts the temporary local-server dependency, and report it.
 - Treat emitted `<svg data-src="...">` markup as design truth for structure,

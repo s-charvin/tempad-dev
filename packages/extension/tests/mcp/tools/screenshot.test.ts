@@ -143,6 +143,99 @@ describe('mcp/tools/screenshot', () => {
     vi.clearAllMocks()
   })
 
+  it.each([0, -1, NaN, Infinity])(
+    'rejects invalid scale %s before calling Figma',
+    async (scale) => {
+      const node = createNode(new Map([[1, createPngBytes(100, 100, 1024)]]))
+      await expect(handleGetScreenshot(node, { scale })).rejects.toThrow(/positive|finite/i)
+      expect(node.exportAsync).not.toHaveBeenCalled()
+      expect(ensureAssetUploaded).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([2, 3])('exports a 100px node at the explicit %sx multiplier', async (scale) => {
+    const bytes = createPngBytes(100 * scale, 100 * scale, 1024)
+    const node = createNode(
+      new Map([
+        [1, createPngBytes(100, 100, 1024)],
+        [scale, bytes]
+      ]),
+      100,
+      100
+    )
+    vi.mocked(ensureAssetUploaded).mockResolvedValue({
+      hash: SCREENSHOT_HASH,
+      url: 'https://example.com/scaled.png',
+      mimeType: 'image/png',
+      size: 1024
+    })
+
+    const result = await handleGetScreenshot(node, { scale })
+
+    expect(node.exportAsync).toHaveBeenCalledExactlyOnceWith({
+      format: 'PNG',
+      constraint: { type: 'SCALE', value: scale }
+    })
+    expect(result).toMatchObject({ width: 100 * scale, height: 100 * scale, scale })
+    expect(ensureAssetUploaded).toHaveBeenCalledWith(bytes, 'image/png', {
+      width: 100 * scale,
+      height: 100 * scale
+    })
+  })
+
+  it.each([1, 3])('rejects an oversized explicit %sx export without downgrading', async (scale) => {
+    const oversized = createPngBytes(100 * scale, 100 * scale, MCP_MAX_ASSET_BYTES + 1)
+    const node = createNode(
+      new Map([
+        [1, createPngBytes(100, 100, 1024)],
+        [scale, oversized],
+        [0.75, createPngBytes(75, 75, 1024)]
+      ]),
+      100,
+      100
+    )
+
+    await expect(handleGetScreenshot(node, { scale })).rejects.toThrow(/explicit|requested/i)
+    expect(node.exportAsync).toHaveBeenCalledExactlyOnceWith({
+      format: 'PNG',
+      constraint: { type: 'SCALE', value: scale }
+    })
+    expect(ensureAssetUploaded).not.toHaveBeenCalled()
+  })
+
+  it('preserves 3x pixels when cropping the exported render bounds', async () => {
+    const directBytes = createPngBytes(360, 360, 4096)
+    const croppedBytes = createPngBytes(300, 300, 1024)
+    const target = createNode(
+      new Map([
+        [1, createPngBytes(120, 120, 1024)],
+        [3, directBytes]
+      ]),
+      100,
+      100
+    )
+    const page = { children: [target], type: 'PAGE' } as unknown as PageNode
+    assignGeometry(target, { x: 10, y: 10, width: 100, height: 100 }, page)
+    Object.assign(target, { absoluteRenderBounds: { x: 0, y: 0, width: 120, height: 120 } })
+    const cropPng = vi.fn().mockResolvedValue(croppedBytes)
+    vi.mocked(ensureAssetUploaded).mockResolvedValue({
+      hash: SCREENSHOT_HASH,
+      url: 'https://example.com/scaled-crop.png',
+      mimeType: 'image/png',
+      size: 1024
+    })
+
+    const result = await handleGetScreenshot(target, { scale: 3, cropPng })
+
+    expect(cropPng).toHaveBeenCalledExactlyOnceWith(directBytes, {
+      x: 30,
+      y: 30,
+      width: 300,
+      height: 300
+    })
+    expect(result).toMatchObject({ width: 300, height: 300, scale: 3 })
+  })
+
   it('returns screenshot metadata when full scale fits size limit', async () => {
     const bytes = createPngBytes(216, 128, 1024)
     const node = createNode(new Map([[1, bytes]]))

@@ -58,6 +58,32 @@ Unverified local builds keep their bundled runtime and never download releases; 
 is rejected. Windows uses named pipes and ACL-checked private storage for managed updates. Its
 [process CI](../../TESTING.md#windows-runtime-ci) is separate from installed desktop-host acceptance.
 
+### Local development
+
+When working inside this monorepo, you can point your agent at the local build instead of the published package:
+
+1. Build the MCP server:
+
+   ```sh
+   pnpm build:mcp
+   ```
+
+2. Use the local build output in your agent's `mcpServers` config:
+
+   ```json
+   {
+     "mcpServers": {
+       "tempad-dev": {
+         "command": "node",
+         "args": ["/path/to/tempad-dev/packages/mcp-server/dist/cli.mjs"],
+         "env": { "TEMPAD_MCP_DEV_CHECKOUT": "/path/to/tempad-dev" }
+       }
+     }
+   }
+   ```
+
+Re-run `pnpm build:mcp` after changing MCP server code, then restart the agent to pick up the changes.
+
 ### Tools and resources
 
 - `get_code`: Tailwind-first JSX/Vue markup plus assets and token references.

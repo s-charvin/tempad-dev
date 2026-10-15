@@ -87,10 +87,15 @@ describe('mcp/code render svg', () => {
     }
   )
 
-  it.each([false, true])(
-    'preserves the layout box around an expanded SVG viewport (inline: %s)',
-    async (inline) => {
+  it.each(
+    [false, true].flatMap((inline) =>
+      [undefined, 'data-hint-mask', 'data-hint-has-mask'].map((maskHint) => ({ inline, maskHint }))
+    )
+  )(
+    'preserves the layout box and mask evidence around an expanded SVG viewport ($inline, $maskHint)',
+    async ({ inline, maskHint }) => {
       const root = createSnapshot({ id: 'rotated', type: 'VECTOR' })
+      root.dataHint = { 'data-hint-component': 'Icon', ...(maskHint ? { [maskHint]: 'true' } : {}) }
       const tree = createTree([root])
       const config = { cssUnit: 'px', rootFontSize: 16, scale: 1 } as const
       const result = await renderTree(root.id, tree, {
@@ -145,6 +150,8 @@ describe('mcp/code render svg', () => {
       expect(markup).toContain('width="460px"')
       expect(markup).toContain('viewBox="-70 -100 460 440"')
       expect(markup.includes('<path')).toBe(inline)
+      if (maskHint) expect(markup).toContain(`${maskHint}="true"`)
+      expect(markup).not.toContain('data-hint-component')
     }
   )
 

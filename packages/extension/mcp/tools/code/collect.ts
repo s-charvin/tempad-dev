@@ -102,6 +102,11 @@ export async function collectNodeData(
 
       assertActive()
       if (hasMediaFills(node, cache)) {
+        const imageScaleMode = resolveImageScaleMode(node)
+        if (imageScaleMode) {
+          processed[snapshot.tag === 'img' ? 'object-fit' : 'background-size'] = imageScaleMode
+        }
+
         const nodeVideoPreviewAssetHashes = new Set<string>()
         processed = await replaceMediaUrlsWithAssets(
           processed,
@@ -361,4 +366,19 @@ function createNodePaintStyleInput(snapshot: NodeSnapshot, cache: GetCodeCacheCo
         ? { width, height }
         : undefined
   }
+}
+
+// 从 Figma IMAGE fill 的 scaleMode 映射到 CSS cover/contain
+// cover 对应 object-fit: cover / background-size: cover
+// contain 对应 object-fit: contain / background-size: contain
+function resolveImageScaleMode(node: SceneNode): 'cover' | 'contain' | undefined {
+  if (!('fills' in node) || !Array.isArray(node.fills)) return undefined
+  for (const fill of node.fills) {
+    if (fill.type !== 'IMAGE' || fill.visible === false) continue
+    const scaleMode = (fill as ImagePaint).scaleMode
+    if (scaleMode === 'FILL' || scaleMode === 'CROP') return 'cover'
+    if (scaleMode === 'FIT') return 'contain'
+    // TILE 无可靠 CSS 等价，跳过
+  }
+  return undefined
 }

@@ -51,6 +51,32 @@ supervisor、Node、浏览器扩展和已安装插件仍需按原方式升级或
 Windows 的托管更新使用命名管道和经过 ACL 校验的私有存储；
 [进程级 CI](../../TESTING.md#windows-runtime-ci) 与已安装桌面宿主的交互验收分别进行。
 
+### 本地开发
+
+在本 monorepo 中开发时，可以将 agent 指向本地构建产物，而非已发布包：
+
+1. 构建 MCP server：
+
+   ```sh
+   pnpm build:mcp
+   ```
+
+2. 在 agent 的 `mcpServers` 配置中使用本地构建产物：
+
+   ```json
+   {
+     "mcpServers": {
+       "tempad-dev": {
+         "command": "node",
+         "args": ["/path/to/tempad-dev/packages/mcp-server/dist/cli.mjs"],
+         "env": { "TEMPAD_MCP_DEV_CHECKOUT": "/path/to/tempad-dev" }
+       }
+     }
+   }
+   ```
+
+修改 MCP server 代码后，重新执行 `pnpm build:mcp`，然后重启 agent 即可生效。
+
 ### 工具和资源
 
 - `get_code`：以 Tailwind 优先的 JSX/Vue 标记输出，并附带资源和变量引用。

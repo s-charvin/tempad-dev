@@ -2,7 +2,16 @@ import { useDocumentVisibility, useEventListener, useWindowFocus } from '@vueuse
 import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
 
 import { readFigmaFileKey } from '@/mcp/figma-session'
-import { layoutReady, selection, selectionRevision, runtimeMode } from '@/ui/state'
+import {
+  activeFocusNode,
+  figmaSelection,
+  layoutReady,
+  loadWorkingSetFromStorage,
+  rehydrateWorkingSet,
+  runtimeMode,
+  selectionRevision,
+  workingNodes
+} from '@/ui/state'
 import { getCanvas, getLeftPanel } from '@/utils'
 
 let selectionFileKey: string | null = null
@@ -29,8 +38,8 @@ export function syncSelection(refreshContent = true) {
   const snapshot = readPageSelection(api)
   if (!snapshot) {
     selectionFileKey = null
-    if (selection.value.length) {
-      selection.value = []
+    if (figmaSelection.value.length) {
+      figmaSelection.value = []
     }
     return
   }
@@ -38,9 +47,9 @@ export function syncSelection(refreshContent = true) {
   const next = snapshot.nodes
   // Node IDs are file-local. Keep same-file wrappers stable, but never retain a
   // previous document's node (and its resources) when the selected IDs coincide.
-  const changed = selectionFileKey !== fileKey || !isSameSelection(next, selection.value)
+  const changed = selectionFileKey !== fileKey || !isSameSelection(next, figmaSelection.value)
   if (changed) {
-    selection.value = next
+    figmaSelection.value = next
   }
   selectionFileKey = fileKey
   if (changed || refreshContent) selectionRevision.value++
@@ -72,13 +81,17 @@ export function useSelection() {
     relevantStyles.clear()
     subtreeRoots.clear()
     const pages = new Set(observedPage ? [observedPage] : [])
-    // Code generation has no output for multiple selections. Avoid traversing
-    // a whole page just to keep a hidden panel's dependencies up to date.
-    if (!observedApi || selection.value.length !== 1) {
+    const selected = activeFocusNode.value
+    if (
+      !observedApi ||
+      !selected ||
+      (figmaSelection.value.length > 1 && !workingNodes.value.length)
+    ) {
       syncPageListeners(pages)
       return
     }
-    const pending: BaseNode[] = [...selection.value]
+    for (const node of workingNodes.value) relevantNodes.add(node.id)
+    const pending: BaseNode[] = [selected]
     const visited = new Set<string>()
     const ancestors = new Set<string>()
 
@@ -101,7 +114,6 @@ export function useSelection() {
       }
     }
 
-    const selected = selection.value[0]!
     subtreeRoots.add(selected.id)
     try {
       trackAncestors(selected.parent)
@@ -258,6 +270,12 @@ export function useSelection() {
     return true
   }
 
+  function refreshSelection(refreshContent = true) {
+    syncSelection(refreshContent)
+    loadWorkingSetFromStorage()
+    if (refreshContent) rehydrateWorkingSet()
+  }
+
   function scheduleRefresh(refreshContent = false) {
     clearTimeout(refreshTimer)
     if (disposed || !layoutReady.value || runtimeMode.value !== 'standard' || !isWindowActive.value)
@@ -266,7 +284,7 @@ export function useSelection() {
     // Read after Figma's event handlers and coalesce drag, typing and native batches.
     refreshTimer = setTimeout(() => {
       const changedPage = syncNativeListeners()
-      syncSelection(contentChanged || changedPage)
+      refreshSelection(contentChanged || changedPage)
       contentChanged = false
     }, 100)
   }
@@ -307,7 +325,7 @@ export function useSelection() {
       if (ready) {
         syncTargets()
         syncNativeListeners()
-        if (runtimeMode.value === 'standard') syncSelection()
+        if (runtimeMode.value === 'standard') refreshSelection()
         return
       }
       clearTimeout(refreshTimer)
@@ -315,9 +333,11 @@ export function useSelection() {
       removeNativeListeners()
       canvas.value = null
       objectsPanel.value = null
-      if (selection.value.length) {
-        selection.value = []
+      // 保留 pinIds / activeFocusId；只清画布镜像与已解析节点派生。
+      if (figmaSelection.value.length) {
+        figmaSelection.value = []
       }
+      rehydrateWorkingSet()
     },
     { immediate: true }
   )
@@ -328,10 +348,12 @@ export function useSelection() {
     syncNativeListeners()
     if (mode !== 'standard') return
     if (!layoutReady.value) return
-    if (active) syncSelection()
+    if (active) refreshSelection()
   })
 
-  watch([selection, selectionRevision], trackSelection, { immediate: true })
+  watch([figmaSelection, selectionRevision, activeFocusNode, workingNodes], trackSelection, {
+    immediate: true
+  })
 
   onBeforeUnmount(() => {
     disposed = true

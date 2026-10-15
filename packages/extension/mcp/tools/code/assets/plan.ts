@@ -4,7 +4,8 @@ import { isRenderablePaint } from '@/utils/figma-paint'
 import type { GetCodeCacheContext } from '../cache'
 import type { NodeSnapshot, VisibleTree } from '../model'
 
-import { getNodeSemanticsCached, hasVisibleEffects } from '../cache'
+import { getNodeSemanticsCached, hasVisibleEffects, isFigmaMaskNode } from '../cache'
+import { DATA_HINT_HAS_MASK } from '../model'
 import { addSubtreeIds } from '../tree'
 
 export type AssetPlan = {
@@ -35,6 +36,7 @@ export function planAssets(
 ): AssetPlan {
   const vectorRoots = new Set<string>()
   const skipped = new Set<string>()
+  const rootIds = new Set(tree.rootIds)
   const vectorInfo = computeVectorInfo(tree, ignoredIds, ctx)
 
   for (const id of tree.order) {
@@ -48,16 +50,19 @@ export function planAssets(
       .filter((child): child is NodeSnapshot => !!child && !ignoredIds?.has(child.id))
 
     const info = vectorInfo.get(id)
+    const canPromoteContainer =
+      node.type === 'COMPONENT' ? rootIds.has(id) : !hasOwnBoxSemantics(node, ctx)
     const isVectorGroup =
       !!info &&
       isEligibleContainer(node) &&
       info.allNonMaskVectorLike &&
       info.nonMaskLeafCount >= 1 &&
-      !hasOwnBoxSemantics(node, ctx) &&
+      canPromoteContainer &&
       (children.length === 1 || info.hasMask || info.nonMaskLeafCount > 1)
 
     if (isVectorGroup || node.assetKind === 'vector') {
       vectorRoots.add(id)
+      addMaskAssetHint(node, info?.hasMask ?? false)
       children.forEach((child) => addSubtreeIds(child.id, tree, skipped))
     }
   }
@@ -110,10 +115,10 @@ function computeVectorInfo(
         continue
       }
       const childInfo = info.get(childId)
-      if (!childInfo || !childInfo.allNonMaskVectorLike) {
+      const child = tree.nodes.get(childId)
+      if (!childInfo || !childInfo.allNonMaskVectorLike || child?.type === 'COMPONENT') {
         allNonMaskVectorLike = false
       }
-      const child = tree.nodes.get(childId)
       if (child && hasNative3d(child, ctx)) allNonMaskVectorLike = false
       if (childInfo) {
         nonMaskLeafCount += childInfo.nonMaskLeafCount
@@ -127,11 +132,16 @@ function computeVectorInfo(
 }
 
 function isEligibleContainer(node: NodeSnapshot): boolean {
-  return node.type === 'GROUP' || node.type === 'FRAME'
+  return node.type === 'GROUP' || node.type === 'FRAME' || node.type === 'COMPONENT'
 }
 
 function hasDesignComponentHint(node: NodeSnapshot): boolean {
   return Boolean(node.dataHint?.['data-hint-design-component']?.trim())
+}
+
+function addMaskAssetHint(node: NodeSnapshot, hasMask: boolean): void {
+  if (!hasMask) return
+  node.dataHint = { ...node.dataHint, [DATA_HINT_HAS_MASK]: 'true' }
 }
 
 function hasOwnBoxSemantics(snapshot: NodeSnapshot, ctx?: GetCodeCacheContext): boolean {
@@ -162,8 +172,7 @@ function hasNative3d(snapshot: NodeSnapshot, ctx?: GetCodeCacheContext): boolean
 
 function isMaskNode(snapshot: NodeSnapshot, ctx?: GetCodeCacheContext): boolean {
   if (ctx) return getNodeSemanticsCached(snapshot.node, ctx).layout.isMask
-  const node = snapshot.node as { isMask?: boolean }
-  return node.isMask === true
+  return isFigmaMaskNode(snapshot.node)
 }
 
 function isVectorLikeLeaf(snapshot: NodeSnapshot): boolean {

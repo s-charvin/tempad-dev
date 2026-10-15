@@ -9,6 +9,7 @@ import type { NodeSnapshot, VisibleTree } from '../model'
 import type { PluginComponent } from './plugin'
 import type { CodeLanguage, RenderContext } from './types'
 
+import { pickMaskDataHints } from '../model'
 import { renderTextSegments } from '../text'
 import { nativeSvg } from '../tokens/markup'
 import { renderPluginComponent } from './plugin'
@@ -113,9 +114,15 @@ async function renderNode(
       svgProps['data-src'] = legacyAssetUrl
       delete svgProps['data-asset-url']
     }
+    // SVG 占位默认不带全量 data-hint；mask 相关 hint 必须保留，否则 Agent 无法感知遮罩。
+    const maskHints = pickMaskDataHints(snapshot.dataHint)
+    if (maskHints) Object.assign(svgProps, maskHints)
     if (svgEntry.raw) {
-      const mergedProps = Object.keys(props).length ? toMarkupAttributes(props) : undefined
-      const content = nativeSvg(svgEntry.raw, mergedProps)
+      const mergedProps = { ...props, ...maskHints }
+      const content = nativeSvg(
+        svgEntry.raw,
+        Object.keys(mergedProps).length ? toMarkupAttributes(mergedProps) : undefined
+      )
       return wrapperProps ? { name: 'div', props: wrapperProps, children: [content] } : content
     }
     const className = props[classAttr]
@@ -218,10 +225,15 @@ async function renderNode(
 
   const isFallback = !pluginComponent
 
-  const dataHint =
-    pluginComponent || snapshot.tag === 'svg' || !snapshot.dataHint
-      ? undefined
-      : { ...snapshot.dataHint, 'data-hint-id': snapshot.id }
+  // svg 标签默认不附带全量 data-hint（避免污染矢量占位）；mask 相关 hint 仍需对 Agent 可见。
+  const dataHint = (() => {
+    if (pluginComponent || !snapshot.dataHint) return undefined
+    if (snapshot.tag === 'svg') {
+      const maskHints = pickMaskDataHints(snapshot.dataHint)
+      return maskHints ? { ...maskHints, 'data-hint-id': snapshot.id } : undefined
+    }
+    return { ...snapshot.dataHint, 'data-hint-id': snapshot.id }
+  })()
 
   if (pluginComponent) {
     const { props } = classProps(

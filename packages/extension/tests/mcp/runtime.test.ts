@@ -323,8 +323,8 @@ describe('mcp/runtime', () => {
 
     const runtime = await importRuntime()
 
-    await runtime.MCP_TOOL_HANDLERS.get_screenshot({ nodeId: 'node-2' })
-    expect(mocks.runGetScreenshot).toHaveBeenCalledWith(node)
+    await runtime.MCP_TOOL_HANDLERS.get_screenshot({ nodeId: 'node-2', scale: 3 })
+    expect(mocks.runGetScreenshot).toHaveBeenCalledWith(node, { scale: 3 })
 
     await runtime.MCP_TOOL_HANDLERS.get_structure({
       nodeId: 'node-2',
@@ -418,32 +418,39 @@ describe('mcp/runtime', () => {
     expect(mocks.runGetCode.mock.calls[0]![4].cache).toBe(mocks.runGetCode.mock.calls[1]![4].cache)
   })
 
-  it('captures separate screenshots for selected nodes and supports explicit one-item batches', async () => {
-    const roots = [createSceneNode('first'), createSceneNode('second')]
-    setFigmaGetNodeById(roots[0]!, roots)
-    const screenshot = {
-      format: 'png',
-      width: 1,
-      height: 1,
-      scale: 1,
-      bytes: 1,
-      asset: {
-        hash: 'a'.repeat(64),
-        url: 'http://localhost/image.png',
-        mimeType: 'image/png',
-        size: 1
+  it.each([undefined, 3])(
+    'captures separate screenshots with scale %s and supports one-item batches',
+    async (scale) => {
+      const roots = [createSceneNode('first'), createSceneNode('second')]
+      setFigmaGetNodeById(roots[0]!, roots)
+      const screenshot = {
+        format: 'png',
+        width: 1,
+        height: 1,
+        scale: 1,
+        bytes: 1,
+        asset: {
+          hash: 'a'.repeat(64),
+          url: 'http://localhost/image.png',
+          mimeType: 'image/png',
+          size: 1
+        }
       }
+      mocks.runGetScreenshot.mockResolvedValue(screenshot)
+      const runtime = await importRuntime()
+      expect(await runtime.MCP_TOOL_HANDLERS.get_screenshot({ scale })).toEqual({
+        results: roots.map(({ id }) => ({ nodeId: id, result: screenshot }))
+      })
+      expect(await runtime.MCP_TOOL_HANDLERS.get_screenshot({ nodeIds: ['first'], scale })).toEqual(
+        {
+          results: [{ nodeId: 'first', result: screenshot }]
+        }
+      )
+      expect(mocks.runGetScreenshot).toHaveBeenNthCalledWith(1, roots[0], { scale })
+      expect(mocks.runGetScreenshot).toHaveBeenNthCalledWith(2, roots[1], { scale })
+      expect(mocks.runGetScreenshot).toHaveBeenNthCalledWith(3, roots[0], { scale })
     }
-    mocks.runGetScreenshot.mockResolvedValue(screenshot)
-    const runtime = await importRuntime()
-    expect(await runtime.MCP_TOOL_HANDLERS.get_screenshot()).toEqual({
-      results: roots.map(({ id }) => ({ nodeId: id, result: screenshot }))
-    })
-    expect(await runtime.MCP_TOOL_HANDLERS.get_screenshot({ nodeIds: ['first'] })).toEqual({
-      results: [{ nodeId: 'first', result: screenshot }]
-    })
-    expect(mocks.runGetScreenshot).toHaveBeenNthCalledWith(2, roots[1])
-  })
+  )
 
   it('reads an exact page by managed key without changing the active page', async () => {
     const root = createSceneNode('page-root')

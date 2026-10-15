@@ -11,6 +11,7 @@ import Panel from '@/components/Panel.vue'
 import CodeSection from '@/components/sections/CodeSection.vue'
 import ErrorSection from '@/components/sections/ErrorSection.vue'
 import MetaSection from '@/components/sections/MetaSection.vue'
+import PinsSection from '@/components/sections/PinsSection.vue'
 import PrefSection from '@/components/sections/PrefSection.vue'
 import {
   syncSelection,
@@ -19,7 +20,7 @@ import {
   useMcp,
   useSelection
 } from '@/composables'
-import { layoutReady, options, runtimeMode, selection } from '@/ui/state'
+import { layoutReady, options, runtimeMode } from '@/ui/state'
 import { getCanvas } from '@/utils'
 
 useSelection()
@@ -144,11 +145,8 @@ const showHint = computed(() => (idle.value || initialLock.value) && lowVisibili
 watch(layoutReady, (ready) => {
   if (ready) {
     syncSelection()
-    return
   }
-  if (selection.value.length) {
-    selection.value = []
-  }
+  // Working Set ID 在 layoutReady=false 时保留；由 useSelection / rehydrate 处理派生清空。
 })
 
 function activateMcp() {
@@ -225,6 +223,7 @@ function activateMcp() {
     <template v-else>
       <PrefSection :collapsed="!options.prefOpen" />
       <MetaSection />
+      <PinsSection />
       <CodeSection />
     </template>
   </Panel>

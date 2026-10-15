@@ -20,6 +20,7 @@ export const NODE_VARIABLE_STYLE_PROPS = {
   paddingRight: ['padding-right'],
   paddingTop: ['padding-top'],
   paddingBottom: ['padding-bottom'],
+  cornerRadius: ['border-radius'],
   topLeftRadius: ['border-top-left-radius'],
   topRightRadius: ['border-top-right-radius'],
   bottomLeftRadius: ['border-bottom-left-radius'],

@@ -20,6 +20,11 @@ export function getChildOverflowCached(
   return overflow
 }
 
+/** Figma 遮罩层判定：无独立 MASK 类型，靠节点 `isMask` 布尔属性。 */
+export function isFigmaMaskNode(node: SceneNode): boolean {
+  return 'isMask' in node && node.isMask === true
+}
+
 export function getNodeSemanticsCached(
   node: SceneNode,
   ctx: GetCodeCacheContext
@@ -71,7 +76,7 @@ export function getNodeSemanticsCached(
       layoutAlign: readLayoutAlign(node),
       layoutPositioning: readLayoutPositioning(node),
       clipsContent: 'clipsContent' in node && node.clipsContent === true,
-      isMask: 'isMask' in node && node.isMask === true
+      isMask: isFigmaMaskNode(node)
     },
     geometry: {
       threeD: readFigma3d(node),

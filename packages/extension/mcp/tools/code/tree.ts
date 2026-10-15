@@ -6,10 +6,16 @@ import {
 } from '@/mcp/semantic-tree'
 import { toDecimalPlace } from '@/utils/number'
 
-import type { AutoLayoutHint, DataHint, NodeSnapshot, TreeStats, VisibleTree } from './model'
-
-import { type GetCodeCacheContext, getChildOverflowCached } from './cache'
+import { type GetCodeCacheContext, getChildOverflowCached, isFigmaMaskNode } from './cache'
 import { getInferredAutoLayout } from './layout-parent'
+import {
+  DATA_HINT_MASK,
+  type AutoLayoutHint,
+  type DataHint,
+  type NodeSnapshot,
+  type TreeStats,
+  type VisibleTree
+} from './model'
 
 const NODE_WORK_BUDGET = 2000
 
@@ -156,6 +162,10 @@ function resolveAutoLayoutHint(
 
 function composeDataHint(node: SceneNode): DataHint | undefined {
   const hints: DataHint = {}
+
+  if (isFigmaMaskNode(node)) {
+    hints[DATA_HINT_MASK] = 'true'
+  }
 
   if (node.type === 'INSTANCE') {
     const componentHint = summarizeComponentHint(node)

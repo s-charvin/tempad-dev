@@ -11,6 +11,7 @@ import {
   GetStructureParametersSchema
 } from './fixtures/extension-0.22.0.mjs'
 import { DesignTaskSchema } from './fixtures/protocol-13-design-task.mjs'
+import { GetScreenshotParametersSchema as Protocol15ScreenshotSchema } from './fixtures/protocol-15-screenshot.mjs'
 
 // Run against the built Hub using the released receiving schemas, not current shared imports.
 export async function checkProtocol13({ port, peer, send, activate, until, call, origin }) {
@@ -163,6 +164,7 @@ export async function checkProtocol13({ port, peer, send, activate, until, call,
   for (const [name, args] of [
     ['get_code', { nodeIds: ['1:2'] }],
     ['get_screenshot', { nodeIds: ['1:2'] }],
+    ['get_screenshot', { nodeId: '1:2', scale: 3 }],
     ['get_structure', { nodeIds: ['1:2'] }],
     ['get_structure', { options: { depth: 0 } }],
     ['get_code', { nodeId: '1:2', resolveTokens: true }]
@@ -212,13 +214,32 @@ export async function checkProtocol13({ port, peer, send, activate, until, call,
     sessions: [{ ...session, sessionId: 'tab-15', fileKey: 'file-15' }]
   })
   await activate(other)
+  other.respond = (message) => {
+    assert.equal(message.payload.name, 'get_screenshot')
+    assert.deepEqual(Protocol15ScreenshotSchema.parse(message.payload.args), message.payload.args)
+    return screenshot
+  }
+  const releasedScreenshot = await call('get_screenshot', { sessionId: 'tab-15', nodeId: '1:2' })
+  assert.equal(releasedScreenshot.isError, undefined, JSON.stringify(releasedScreenshot))
+  assert.equal(releasedScreenshot.structuredContent.scale, 1)
+  const protocol15Calls = other.calls.length
+  for (const scale of [1, 3]) {
+    const unsupported = await call('get_screenshot', { sessionId: 'tab-15', nodeId: '1:2', scale })
+    assert.equal(unsupported.isError, true)
+    assert.match(JSON.stringify(unsupported), /EXTENSION_UPGRADE_REQUIRED/)
+  }
+  assert.equal(other.calls.length, protocol15Calls, 'scaled reads must not reach protocol 15')
   const routedCount = released.calls.length
   assert.match(
     JSON.stringify(await call('get_code', { taskId: task.taskId, nodeIds: ['1:2'] })),
     /EXTENSION_UPGRADE_REQUIRED/
   )
   assert.equal(released.calls.length, routedCount)
-  assert.equal(other.calls.length, 0, 'task-bound reads must never switch to a newer active peer')
+  assert.equal(
+    other.calls.length,
+    protocol15Calls,
+    'task-bound reads must never switch to a newer active peer'
+  )
   assert.equal(
     (await call('get_code', { sessionId: session.sessionId, nodeId: '1:2' })).structuredContent
       .code,

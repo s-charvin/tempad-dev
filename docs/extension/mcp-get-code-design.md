@@ -301,6 +301,27 @@ rather than the `bg-[...]` image/color utilities.
   with candidates from the whole subtree: an unrelated literal can equal another node's syntax.
   Downstream token transforms operate on CSS references, preserving strings and asset URLs.
 
+## Figma mask (`isMask`)
+
+Figma has no `SceneNode.type === 'MASK'`. Masking is a boolean on a layer (`isMask === true`).
+
+### Internal use (unchanged)
+
+- `isFigmaMaskNode()` / `nodeSemantics.layout.isMask` is the single source of truth for detection.
+- Asset planning (`planAssets`): mask leaves do not count as artwork leaves; groups/frames that are vector-only **and** contain a mask are promoted to one `vectorRoots` SVG export; mask descendants are skipped as separate DOM nodes (mask baked into SVG).
+- Vector themeability: mask presence breaks single-channel themeable classification.
+- Semantic tree: mask nodes are never treated as transparent wrappers.
+
+### Agent-visible exposure
+
+| Surface                 | Signal                      | Meaning                                                                                                     |
+| ----------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `get_code` markup       | `data-hint-mask="true"`     | This node **is** the mask layer                                                                             |
+| `get_code` markup       | `data-hint-has-mask="true"` | This vector export root **contains** a mask (usually after group promotion); do not invent CSS `mask-image` |
+| `get_structure` outline | `isMask: true`              | Same as mask layer; omitted when false                                                                      |
+
+Hints are stripped for generic SVG noise, but **mask-related hints are preserved** on SVG placeholders.
+
 ## Request-scoped cache layer
 
 ### Purpose
@@ -412,6 +433,8 @@ The request context is threaded through:
 - Vector containers can be converted to a single SVG when their subtree is vector-like and the container itself does not carry wrapper semantics such as its own fill/stroke/effects/clipping or design-component hints.
   Component boundaries and hints inside that subtree also prevent ancestor promotion, keeping
   the component structure available in the output.
+  An unhinted, vector-only component requested directly can be exported as one SVG to preserve its
+  full bounds. Native 3D scenes retain their structure.
 - Themeable vectors are single-color vectors that can safely use one contextual color channel.
   Full-bounds SVG exports are mapped from Figma's baked absolute coordinates into local coordinates
   using the inverse linear transform. Node geometry replaces integer-rounded export dimensions,

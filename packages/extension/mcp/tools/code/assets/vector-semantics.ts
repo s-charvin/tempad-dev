@@ -7,7 +7,8 @@ import {
   getNodeSemanticsCached,
   getPaintsFromState,
   hasRenderableStrokes,
-  hasVisibleEffects
+  hasVisibleEffects,
+  isFigmaMaskNode
 } from '../cache'
 import { type PaintChannel, resolveSolidPaintChannel, resolveStylePaintChannel } from './paint'
 
@@ -138,7 +139,7 @@ function readLivePaints(
 }
 
 function isMaskNode(node: SceneNode): boolean {
-  return 'isMask' in node && node.isMask === true
+  return isFigmaMaskNode(node)
 }
 
 function cacheColorModel(

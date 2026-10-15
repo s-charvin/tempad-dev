@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
+import { createGetCodeCacheContext } from '@/mcp/tools/code/cache'
 import { inferResizingStyles, mergeInferredAutoLayout } from '@/mcp/tools/code/styles/layout'
 
 describe('mcp/code styles layout', () => {
@@ -219,5 +220,62 @@ describe('mcp/code styles layout', () => {
     )
 
     expect(result).toEqual({})
+  })
+
+  it('uses var(--token) for gap/padding when boundVariables are present', () => {
+    const figmaMock = {
+      mixed: Symbol('mixed'),
+      getStyleById: vi.fn(() => null),
+      variables: {
+        getVariableById: vi.fn((id: string) => {
+          if (id === 'var-gap') return { id, name: 'Spacing/Gap-MD' }
+          if (id === 'var-pad') return { id, name: 'Spacing/Padding-MD' }
+          return null
+        })
+      }
+    }
+    ;(globalThis as { figma?: unknown }).figma = figmaMock
+
+    const cache = createGetCodeCacheContext(new Map(), { metrics: true })
+    const style: Record<string, string> = {}
+    const node = {
+      layoutMode: 'HORIZONTAL',
+      itemSpacing: 12,
+      paddingTop: 16,
+      paddingRight: 16,
+      paddingBottom: 16,
+      paddingLeft: 16,
+      boundVariables: {
+        itemSpacing: { id: 'var-gap' },
+        paddingTop: { id: 'var-pad' },
+        paddingRight: { id: 'var-pad' },
+        paddingBottom: { id: 'var-pad' },
+        paddingLeft: { id: 'var-pad' }
+      }
+    } as unknown as SceneNode
+
+    const merged = mergeInferredAutoLayout(style, node, cache)
+
+    expect(merged.gap).toBe('var(--Spacing-Gap-MD)')
+    expect(merged['padding-top']).toBe('var(--Spacing-Padding-MD)')
+    expect(merged['padding-right']).toBe('var(--Spacing-Padding-MD)')
+    expect(merged['padding-bottom']).toBe('var(--Spacing-Padding-MD)')
+    expect(merged['padding-left']).toBe('var(--Spacing-Padding-MD)')
+
+    delete (globalThis as { figma?: unknown }).figma
+  })
+
+  it('falls back to literal px when boundVariables are absent', () => {
+    const style: Record<string, string> = {}
+    const node = {
+      layoutMode: 'VERTICAL',
+      itemSpacing: 8,
+      paddingTop: 4
+    } as unknown as SceneNode
+
+    const merged = mergeInferredAutoLayout(style, node)
+
+    expect(merged.gap).toBe('8px')
+    expect(merged['padding-top']).toBe('4px')
   })
 })

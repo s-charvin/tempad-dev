@@ -20,6 +20,7 @@ describe('legacy extension routing', () => {
       ['get_code', { nodeIds: ['1:2', '1:3'] }],
       ['get_code', { resolveTokens: true }],
       ['get_screenshot', { nodeIds: ['1:2'] }],
+      ['get_screenshot', { nodeId: '1:2', scale: 3 }],
       ['get_code', { taskId: 'task' }]
     ] as const) {
       expect(() => legacyToolPayload(name, args)).toThrow(

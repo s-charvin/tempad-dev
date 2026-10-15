@@ -82,6 +82,21 @@ export function resolveRunAttrs(
     style['text-decoration-line'] = seg.textDecoration.toLowerCase().replace('_', '-')
   }
 
+  // 补全 text-decoration-color：下划线颜色可能与文字颜色不同
+  if (seg.textDecorationColor) {
+    const decoColor = seg.textDecorationColor as
+      | { r: number; g: number; b: number }
+      | { value: SolidPaint }
+    if ('r' in decoColor) {
+      style['text-decoration-color'] = formatHexAlpha(decoColor, 1)
+    } else if (decoColor.value?.color) {
+      style['text-decoration-color'] = formatHexAlpha(
+        decoColor.value.color,
+        decoColor.value.opacity ?? 1
+      )
+    }
+  }
+
   return style
 }
 

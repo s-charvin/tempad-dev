@@ -86,8 +86,13 @@ async function handleGetScreenshot(
   args?: GetScreenshotParametersInput
 ): Promise<GetScreenshotReadResult> {
   const { targets, batch } = resolveReadTargets(args)
-  if (!batch) return runGetScreenshot(singleReadTarget(targets))
-  return readNodeBatch(targets, (node) => runGetScreenshot(node), buildGetScreenshotToolResult)
+  const options = { scale: args?.scale }
+  if (!batch) return runGetScreenshot(singleReadTarget(targets), options)
+  return readNodeBatch(
+    targets,
+    (node) => runGetScreenshot(node, options),
+    buildGetScreenshotToolResult
+  )
 }
 
 async function handleGetStructure(args?: GetStructureParametersInput): Promise<GetStructureResult> {

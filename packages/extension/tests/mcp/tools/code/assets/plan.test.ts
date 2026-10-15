@@ -96,6 +96,37 @@ describe('mcp/code/assets plan', () => {
     expect(result.skippedIds).toEqual(new Set(['art']))
   })
 
+  it('promotes COMPONENT roots so exported assets include the full component bounds', () => {
+    const tree = {
+      rootIds: ['component'],
+      order: ['component', 'frame', 'glyph'],
+      nodes: new Map([
+        [
+          'component',
+          node('component', {
+            children: ['frame'],
+            type: 'COMPONENT',
+            fills: [{ type: 'SOLID', visible: true, color: { r: 0, g: 0, b: 0 } } as Paint]
+          })
+        ],
+        [
+          'frame',
+          node('frame', {
+            children: ['glyph'],
+            type: 'FRAME',
+            fills: [{ type: 'SOLID', visible: true, color: { r: 0, g: 0, b: 0 } } as Paint]
+          })
+        ],
+        ['glyph', node('glyph', { assetKind: 'vector', type: 'VECTOR' })]
+      ])
+    } as unknown as VisibleTree
+
+    const result = planAssets(tree)
+
+    expect(result.vectorRoots).toEqual(new Set(['component']))
+    expect(result.skippedIds).toEqual(new Set(['frame', 'glyph']))
+  })
+
   it('handles missing child metadata without promoting the parent group', () => {
     const tree = {
       order: ['broken-parent', 'leaf'],
@@ -162,6 +193,7 @@ describe('mcp/code/assets plan', () => {
 
     expect(result.vectorRoots).toEqual(new Set(['group']))
     expect(result.skippedIds).toEqual(new Set(['mask', 'content-group', 'v1']))
+    expect(tree.nodes.get('group')?.dataHint?.['data-hint-has-mask']).toBe('true')
   })
 
   it('promotes FRAME with mask and vector-like non-mask descendants', () => {

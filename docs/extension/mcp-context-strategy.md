@@ -69,6 +69,14 @@ This document records the current context-control strategy for TemPad Dev MCP ou
      steps and exact formatted-byte check when changing this path.
 4. `get_screenshot` is visible but selective.
    - It returns one bounded PNG per root through MCP `resource_link` blocks to existing capability URLs.
+   - Optional `scale` is a positive Figma-native export multiplier: `scale: 3` sends
+     `{ format: 'PNG', constraint: { type: 'SCALE', value: 3 } }` to `node.exportAsync`.
+     A 100×100 node exported at 3× produces 300×300 pixels; no PNG upsampling is involved.
+     An explicit multiplier never automatically decreases. Export failures or an oversized asset
+     return an error for that root. Omitted `scale` retains automatic sizing starting at 1×.
+   - The result's `width` and `height` come from the PNG itself, and `scale` identifies its export
+     multiplier. The same multiplier applies to every batch root; preserve it when continuing
+     `remainingNodeIds`. It is independent of `get_code`'s `codegen.config.scale`.
    - When the local Hub owns the bytes, the descriptor also exposes the same ephemeral file through
      `asset.localPath`, avoiding a loopback download from sandboxed local clients.
    - Normally use one final check for a new composition or material visual change; skip mechanical

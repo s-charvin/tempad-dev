@@ -47,7 +47,7 @@ const failures = []
 const metricSamples = []
 const environment = {
   PATH: process.env.PATH,
-  HOME: process.env.HOME,
+  HOME: directory,
   TEMPAD_MCP_RUNTIME_DIR: directory,
   TEMPAD_MCP_LOG_DIR: directory,
   TEMPAD_MCP_ASSET_DIR: join(directory, 'assets'),
@@ -262,6 +262,7 @@ try {
     ['get_code', { nodeIds: ['1:2', '1:3'] }],
     ['get_code', { resolveTokens: true }],
     ['get_screenshot', { nodeIds: ['1:2'] }],
+    ['get_screenshot', { nodeId: '1:2', scale: 3 }],
     ['get_design_system', {}],
     ['manage_design_task', { action: 'begin', title: 'Unavailable', requestId: randomUUID() }],
     ['list_design_sessions', {}],
@@ -385,7 +386,7 @@ try {
           format: 'png',
           width: 1,
           height: 1,
-          scale: 1,
+          scale: 3,
           bytes: bytes.length,
           asset: modernCodePayload.assets[0]
         }
@@ -394,7 +395,10 @@ try {
     ]
   }
   modern.respond = () => batchScreenshot
-  const screenshots = await call('get_screenshot', { nodeIds: ['1:2', '1:3'] })
+  const screenshotArgs = { nodeIds: ['1:2', '1:3'], scale: 3 }
+  const screenshots = await call('get_screenshot', screenshotArgs)
+  assert.deepEqual(modern.calls.at(-1).payload.args, screenshotArgs)
+  assert.equal(screenshots.structuredContent.results[0].result.scale, 3)
   assert.equal(screenshots.content.filter(({ type }) => type === 'resource_link').length, 1)
   assert.deepEqual(screenshots.structuredContent.results[1], batchScreenshot.results[1])
   assert.deepEqual(
@@ -513,7 +517,7 @@ try {
   }
   const begin = await lifecycle(beginArgs)
   let task = begin.structuredContent
-  assert.ok(task.taskId, JSON.stringify(begin))
+  assert.ok(task?.taskId, JSON.stringify(begin))
   assert.equal((await lifecycle(beginArgs)).structuredContent.taskId, task.taskId)
   const taskStructure = await call('get_structure', { taskId: task.taskId })
   assert.deepEqual(taskStructure.structuredContent, structure)

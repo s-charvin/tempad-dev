@@ -3,13 +3,15 @@ import { nextTick } from 'vue'
 
 import { ui } from '@/ui/figma'
 import {
+  activeFocusId,
   activePlugin,
   options,
   plugins,
   savePlugin,
+  pinIds,
   selectedNode,
   selectedTemPadComponent,
-  selection
+  workingNodes
 } from '@/ui/state'
 
 function createDefaultOptions() {
@@ -32,14 +34,20 @@ function createDefaultOptions() {
   }
 }
 
+function resetWorkingSet() {
+  pinIds.value = []
+  activeFocusId.value = null
+  workingNodes.value = []
+}
+
 describe('ui/state', () => {
   beforeEach(async () => {
     await navigator.locks.request('tempad-dev-plugins', () => undefined)
     localStorage.removeItem('tempad-dev')
     localStorage.removeItem('tempad-dev-plugins')
     options.value = createDefaultOptions()
+    resetWorkingSet()
     plugins.value = {}
-    selection.value = []
     await nextTick()
     await navigator.locks.request('tempad-dev-plugins', () => undefined)
   })
@@ -54,11 +62,13 @@ describe('ui/state', () => {
     expect(options.value.variableDisplay).toBe('reference')
   })
 
-  it('tracks selected node from selection state', () => {
+  it('tracks selected node from active focus within working set', () => {
     expect(selectedNode.value).toBeNull()
 
-    const node = { id: 'node-1' } as SceneNode
-    selection.value = [node]
+    const node = { id: 'node-1', name: 'node-1', visible: true } as SceneNode
+    pinIds.value = ['node-1']
+    activeFocusId.value = 'node-1'
+    workingNodes.value = [node]
 
     expect(selectedNode.value).toBe(node)
   })
@@ -191,10 +201,12 @@ describe('ui/state', () => {
     expect(plugins.value).toEqual({})
   })
 
-  it('derives tempad component metadata from selected frame node', () => {
+  it('derives tempad component metadata from focused frame node', () => {
     const selectedFrame = {
+      id: 'frame-1',
       type: 'FRAME',
       name: '🧩 Button',
+      visible: true,
       getSharedPluginData(_ns: string, key: string) {
         if (key === 'source') return JSON.stringify({ libName: '@baidu/one-ui', name: 'Button' })
         if (key === 'code') return '<>\n<Stack>\n  <Button />\n</Stack>\n</>'
@@ -203,7 +215,9 @@ describe('ui/state', () => {
       }
     } as unknown as SceneNode
 
-    selection.value = [selectedFrame]
+    pinIds.value = ['frame-1']
+    activeFocusId.value = 'frame-1'
+    workingNodes.value = [selectedFrame]
 
     expect(selectedTemPadComponent.value).toEqual({
       code: '<Button />',

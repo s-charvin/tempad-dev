@@ -2,6 +2,25 @@ import { describe, expect, it } from 'vitest'
 
 import { assertVersionedToolSupport, versionedReadNotice } from '../src/versioned-extension'
 
+describe('screenshot export scale compatibility', () => {
+  it.each([13, 15])('rejects an explicit multiplier on protocol %s', (protocolVersion) => {
+    for (const scale of [1, 3]) {
+      expect(() =>
+        assertVersionedToolSupport(protocolVersion, 'get_screenshot', { nodeId: '1:2', scale })
+      ).toThrow(expect.objectContaining({ code: 'EXTENSION_UPGRADE_REQUIRED' }))
+    }
+    expect(() =>
+      assertVersionedToolSupport(protocolVersion, 'get_screenshot', { nodeId: '1:2' })
+    ).not.toThrow()
+  })
+
+  it('allows exact scaled reads on the current protocol', () => {
+    expect(() =>
+      assertVersionedToolSupport(16, 'get_screenshot', { nodeIds: ['1:2', '1:3'], scale: 3 })
+    ).not.toThrow()
+  })
+})
+
 describe('protocol 13 read compatibility', () => {
   it.each([
     ['get_code', { nodeIds: ['1:2'] }],

@@ -217,7 +217,7 @@ export const TOOL_DEFS = [
   extTool({
     name: 'get_screenshot',
     description:
-      'Capture a bounded rendered PNG per exact nodeId/nodeIds or selected node. Multi-selection and explicit nodeIds return independent results keyed by nodeId, including per-node errors. Continue remainingNodeIds with nodeIds. Single-node calls retain the flat result. Open each returned PNG to visually verify it.',
+      'Capture a bounded rendered PNG per exact nodeId/nodeIds or selected node. Set scale for Figma-native multiplier export (e.g. 3 for 3x); explicit scales never automatically downgrade. Omit scale for automatic sizing. Multi-selection and explicit nodeIds return independent results keyed by nodeId, including per-node errors. Continue remainingNodeIds with nodeIds and the same scale. Single-node calls retain the flat result. Open each returned PNG to visually verify it.',
     annotations: READ_ONLY_ANNOTATIONS,
     parameters: GetScreenshotParametersSchema,
     target: 'extension',

@@ -233,3 +233,95 @@ describe('mcp/code collectNodeData operation counts', () => {
     })
   })
 })
+
+describe('mcp/code collectNodeData image scale mode mapping', () => {
+  it('maps FILL scale mode to object-fit on img nodes', async () => {
+    const { hasMediaFills } = await import('@/mcp/tools/code/assets')
+    vi.mocked(hasMediaFills).mockReturnValue(true)
+
+    const snapshot = createSnapshot({ id: 'img-1', type: 'RECTANGLE' })
+    snapshot.tag = 'img'
+    snapshot.node = {
+      id: 'img-1',
+      type: 'RECTANGLE',
+      visible: true,
+      getCSSAsync: vi.fn().mockResolvedValue({}),
+      fills: [{ type: 'IMAGE', visible: true, scaleMode: 'FILL' }]
+    } as unknown as SceneNode
+
+    const tree = createTree([snapshot])
+    const cache = createGetCodeCacheContext(new Map())
+
+    const result = await collectNodeData(
+      tree,
+      { cssUnit: 'px', rootFontSize: 16, scale: 1 },
+      new Map(),
+      cache
+    )
+
+    expect(result.styles.get('img-1')?.['object-fit']).toBe('cover')
+    expect(result.styles.get('img-1')?.['background-size']).toBeUndefined()
+
+    vi.mocked(hasMediaFills).mockReturnValue(false)
+  })
+
+  it('maps FIT scale mode to background-size on non-img nodes', async () => {
+    const { hasMediaFills } = await import('@/mcp/tools/code/assets')
+    vi.mocked(hasMediaFills).mockReturnValue(true)
+
+    const snapshot = createSnapshot({ id: 'frame-1', type: 'FRAME' })
+    snapshot.tag = 'div'
+    snapshot.node = {
+      id: 'frame-1',
+      type: 'FRAME',
+      visible: true,
+      getCSSAsync: vi.fn().mockResolvedValue({}),
+      fills: [{ type: 'IMAGE', visible: true, scaleMode: 'FIT' }]
+    } as unknown as SceneNode
+
+    const tree = createTree([snapshot])
+    const cache = createGetCodeCacheContext(new Map())
+
+    const result = await collectNodeData(
+      tree,
+      { cssUnit: 'px', rootFontSize: 16, scale: 1 },
+      new Map(),
+      cache
+    )
+
+    expect(result.styles.get('frame-1')?.['background-size']).toBe('contain')
+    expect(result.styles.get('frame-1')?.['object-fit']).toBeUndefined()
+
+    vi.mocked(hasMediaFills).mockReturnValue(false)
+  })
+
+  it('skips TILE scale mode', async () => {
+    const { hasMediaFills } = await import('@/mcp/tools/code/assets')
+    vi.mocked(hasMediaFills).mockReturnValue(true)
+
+    const snapshot = createSnapshot({ id: 'img-2', type: 'RECTANGLE' })
+    snapshot.tag = 'img'
+    snapshot.node = {
+      id: 'img-2',
+      type: 'RECTANGLE',
+      visible: true,
+      getCSSAsync: vi.fn().mockResolvedValue({}),
+      fills: [{ type: 'IMAGE', visible: true, scaleMode: 'TILE' }]
+    } as unknown as SceneNode
+
+    const tree = createTree([snapshot])
+    const cache = createGetCodeCacheContext(new Map())
+
+    const result = await collectNodeData(
+      tree,
+      { cssUnit: 'px', rootFontSize: 16, scale: 1 },
+      new Map(),
+      cache
+    )
+
+    expect(result.styles.get('img-2')?.['object-fit']).toBeUndefined()
+    expect(result.styles.get('img-2')?.['background-size']).toBeUndefined()
+
+    vi.mocked(hasMediaFills).mockReturnValue(false)
+  })
+})

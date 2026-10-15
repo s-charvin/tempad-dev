@@ -7,7 +7,16 @@ vi.mock('@/utils/codegen', async (original) => ({
 }))
 
 import CodeSection from '@/components/sections/CodeSection.vue'
-import { activePlugin, options, plugins, selection, selectionRevision } from '@/ui/state'
+import {
+  activeFocusId,
+  activePlugin,
+  options,
+  pinIds,
+  plugins,
+  selection,
+  selectionRevision,
+  workingNodes
+} from '@/ui/state'
 import { generateCodeBlocksForNode } from '@/utils/codegen'
 
 import { mount, unmountAll } from './mount'
@@ -20,6 +29,28 @@ afterEach(() => {
   plugins.value = {}
   vi.useRealTimers()
   vi.resetAllMocks()
+  activeFocusId.value = null
+  pinIds.value = []
+  workingNodes.value = []
+})
+
+it('updates code when the working set focus changes with an unchanged multi-selection', async () => {
+  const first = { id: 'pinned-first' } as SceneNode
+  const second = { id: 'pinned-second' } as SceneNode
+  selection.value = [first, second]
+  pinIds.value = [first.id, second.id]
+  workingNodes.value = [first, second]
+  activeFocusId.value = first.id
+  vi.mocked(generateCodeBlocksForNode).mockImplementation(async (node) => ({
+    codeBlocks: [{ name: 'css', title: 'CSS', lang: 'css', code: node.id }]
+  }))
+  const host = mount(CodeSection)
+  await expect.poll(() => host.textContent).toContain('pinned-first')
+
+  activeFocusId.value = second.id
+  await expect.poll(() => host.textContent).toContain('pinned-second')
+  expect(host.textContent).not.toContain('pinned-first')
+  expect(selection.value).toEqual([first, second])
 })
 
 it('keeps the latest selection code and does not regenerate when the panel moves', async () => {

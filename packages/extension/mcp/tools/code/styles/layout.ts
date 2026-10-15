@@ -1,3 +1,4 @@
+import { getVariableCssExpr, resolveVariableAlias } from '@/utils/figma-variables'
 import { toDecimalPlace } from '@/utils/number'
 
 import type { GetCodeCacheContext } from '../cache'
@@ -33,7 +34,12 @@ export function mergeInferredAutoLayout(
   }
 
   if (typeof source.itemSpacing === 'number' && !hasGap(merged)) {
-    merged.gap = `${toDecimalPlace(source.itemSpacing)}px`
+    merged.gap = resolveLayoutVar(
+      node,
+      'itemSpacing',
+      `${toDecimalPlace(source.itemSpacing)}px`,
+      ctx
+    )
   }
 
   const justify = mapAxisAlignToCss(source.primaryAxisAlignItems)
@@ -51,16 +57,36 @@ export function mergeInferredAutoLayout(
   }
 
   if (typeof source.paddingTop === 'number') {
-    merged['padding-top'] = `${toDecimalPlace(source.paddingTop)}px`
+    merged['padding-top'] = resolveLayoutVar(
+      node,
+      'paddingTop',
+      `${toDecimalPlace(source.paddingTop)}px`,
+      ctx
+    )
   }
   if (typeof source.paddingRight === 'number') {
-    merged['padding-right'] = `${toDecimalPlace(source.paddingRight)}px`
+    merged['padding-right'] = resolveLayoutVar(
+      node,
+      'paddingRight',
+      `${toDecimalPlace(source.paddingRight)}px`,
+      ctx
+    )
   }
   if (typeof source.paddingBottom === 'number') {
-    merged['padding-bottom'] = `${toDecimalPlace(source.paddingBottom)}px`
+    merged['padding-bottom'] = resolveLayoutVar(
+      node,
+      'paddingBottom',
+      `${toDecimalPlace(source.paddingBottom)}px`,
+      ctx
+    )
   }
   if (typeof source.paddingLeft === 'number') {
-    merged['padding-left'] = `${toDecimalPlace(source.paddingLeft)}px`
+    merged['padding-left'] = resolveLayoutVar(
+      node,
+      'paddingLeft',
+      `${toDecimalPlace(source.paddingLeft)}px`,
+      ctx
+    )
   }
 
   return merged
@@ -226,4 +252,20 @@ function hasPadding(s: StyleMap) {
     s['padding-bottom'] ||
     s['padding-left']
   )
+}
+
+// 检查节点是否绑定了 Figma Variable，若有则返回 var(--token) 而非字面量
+function resolveLayoutVar(
+  node: SceneNode | undefined,
+  field: string,
+  fallback: string,
+  ctx?: GetCodeCacheContext
+): string {
+  if (!node || !ctx) return fallback
+  const bound = (node as { boundVariables?: Record<string, unknown> }).boundVariables
+  const alias = bound?.[field]
+  if (!alias) return fallback
+  const variable = resolveVariableAlias(alias as { id?: string }, ctx.readers)
+  if (!variable) return fallback
+  return getVariableCssExpr(variable)
 }
