@@ -676,7 +676,7 @@ try {
     process.stdout.write(`Bridge byte samples: ${JSON.stringify(metricSamples)}\n`)
   }
   process.stdout.write(
-    'Bridge compatibility passed: protocol 13 reads/writes/tasks/assets/reconnect, legacy reads/assets/reconnect, upgrade errors, current routing/task fences and negotiated terminal receipts.\n'
+    'Bridge compatibility passed: protocol 13 reads/writes/tasks/assets/reconnect, protocol 15/16 screenshots, legacy reads/assets/reconnect, upgrade errors, current routing/task fences and negotiated terminal receipts.\n'
   )
 } catch (error) {
   throw new Error(`Bridge compatibility failed. Child diagnostics:\n${stderr.slice(-16_384)}`, {

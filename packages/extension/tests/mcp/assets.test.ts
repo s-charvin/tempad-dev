@@ -39,6 +39,7 @@ afterEach(() => {
   setAssetServerUrl(null)
   setAssetDownloader(null)
   setAssetUploader(null)
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
@@ -191,6 +192,25 @@ describe('mcp/assets', () => {
     expect(vi.mocked(logger.log).mock.calls.flat().join(' ')).not.toContain(
       'private-upload-capability'
     )
+  })
+
+  it('restores an evicted Hub asset after the upload cache expires', async () => {
+    mockCryptoDigest()
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000)
+    const hubAssets = new Map<string, Uint8Array>()
+    setAssetUploader(async ({ hash, bytes }) => {
+      hubAssets.set(hash, bytes)
+      now.mockReturnValue(1_100)
+    })
+    setAssetServerUrl('http://assets.local')
+    const bytes = new Uint8Array([1, 2, 3])
+    await ensureAssetUploaded(bytes, 'image/png')
+
+    hubAssets.clear()
+    now.mockReturnValue(3_601_001)
+    await ensureAssetUploaded(bytes, 'image/png')
+
+    expect(hubAssets.get(EXPECTED_HASH)).toEqual(bytes)
   })
 
   it('deduplicates in-flight uploads for identical server/hash pairs', async () => {

@@ -170,6 +170,15 @@ Optional environment variables:
 - `TEMPAD_MCP_LOG_DIR`: Override log directory (defaults to `log` under the temporary root).
 - `TEMPAD_MCP_ASSET_DIR`: Override asset storage directory (defaults to `assets` under the temporary root).
 
+Assets are temporary cache entries. When an upload needs space, the Hub reclaims the least
+recently used assets that have been idle for more than one hour, protecting active transfers
+and accounting for concurrent upload reservations. If reclaimable space is insufficient, the
+upload still fails with HTTP 507. Setting the TTL to `0` disables age-based sweeps only, not
+capacity eviction. A connection from an extension older than protocol 17 disables capacity
+eviction until the Hub restarts, preserving that extension's unbounded upload cache references.
+Tool results renew the access time of returned local assets; the extension
+rechecks completed uploads after one hour. Copy assets into your project for durable storage.
+
 The Hub exclusively locks its state and asset directories before loading either store, even
 when another Hub uses a different runtime directory. These locks remain held until process
 exit so shutdown writes cannot overlap a replacement Hub. Older releases do not honor these

@@ -10,12 +10,13 @@ export const TEMPAD_MCP_BRIDGE_SUBPROTOCOL = 'tempad-mcp'
 // serving the versions below, and the extension accepts any Hub that still lists its own.
 // Listing a version is a promise about the bytes: unknown envelope fields are tolerated, but a
 // change inside a payload object means the Hub must still send what that version can read.
-export const TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION = 16
+export const TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION = 17
 // Extension protocol versions this Hub still serves, oldest first. The Hub upgrades itself on
 // every launch while the extension waits for store review, so the Hub carries the compatibility.
 export const TEMPAD_MCP_BRIDGE_SUPPORTED_PROTOCOL_VERSIONS: readonly number[] = [
   13,
   15,
+  16,
   TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION
 ]
 
@@ -45,6 +46,10 @@ export const MCP_AUTO_ACTIVATE_GRACE_MS = 1500
 export const MCP_MAX_ASSET_BYTES = 8 * 1024 * 1024
 // Maximum aggregate size of the local asset store (bytes).
 export const MCP_MAX_ASSET_STORE_BYTES = 256 * 1024 * 1024
+// Protect recently used assets from capacity eviction. Upload caches must expire no later.
+export const MCP_ASSET_CACHE_GRACE_MS = 60 * 60 * 1000
+// Earlier extension protocols keep completed upload references indefinitely.
+export const MCP_ASSET_CACHE_PROTOCOL_VERSION = 17
 // Maximum number of asset request bodies accepted concurrently.
 export const MCP_MAX_CONCURRENT_ASSET_UPLOADS = 4
 // Maximum simultaneous browser extension connections to one local Hub.

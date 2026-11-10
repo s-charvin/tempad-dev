@@ -28,6 +28,7 @@ import {
   CanvasPageSnapshotSchema,
   DesignTaskSchema,
   MCP_APPLY_CANVAS_RUNTIME_BUDGET_BYTES,
+  MCP_ASSET_CACHE_PROTOCOL_VERSION,
   MCP_NODE_READ_BATCH_WORK_BUDGET_MS,
   MCP_TOOL_INLINE_BUDGET_BYTES,
   TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION,
@@ -664,6 +665,7 @@ export async function startHub(
   let assetStore: ReturnType<typeof createAssetStore>
   let assetHttpServer: ReturnType<typeof createAssetHttpServer>
   let assetCleanupTimer: ReturnType<typeof setInterval> | undefined
+  let hasUnboundedAssetCache = false
 
   function scheduleAssetCleanup(): void {
     if (assetTtlMs <= 0) {
@@ -1417,7 +1419,7 @@ export async function startHub(
   }
 
   function addLocalAssetPath(asset: AssetDescriptor): AssetDescriptor {
-    const record = assetStore.get(asset.hash)
+    const record = assetStore.touch(asset.hash)
     return record && existsSync(record.filePath) ? { ...asset, localPath: record.filePath } : asset
   }
 
@@ -1744,7 +1746,15 @@ export async function startHub(
         ? { admit: () => runtimeControl.admitting(), ...endpointTokens, port: endpoints?.httpPort }
         : {}),
       authorizeExtensionOrigin: (origin) =>
-        extensionRegistry.getActive()?.origin === origin.toLowerCase()
+        extensionRegistry.getActive()?.origin === origin.toLowerCase(),
+      canEvictAssets: () =>
+        !hasUnboundedAssetCache &&
+        extensionRegistry
+          .list()
+          .every(
+            (extension) =>
+              (extension.runtime?.protocolVersion ?? 0) >= MCP_ASSET_CACHE_PROTOCOL_VERSION
+          )
     })
     designTasks.restore()
     terminalReceipts.restore(designTasks.executionState())
@@ -1873,6 +1883,8 @@ export async function startHub(
         log.info({ id: extensionId }, 'Auto-activated sole extension after grace period.')
       },
       onConnected: (extensionId) => {
+        if (extensionRegistry.list().find((extension) => extension.id === extensionId)?.legacy)
+          hasUnboundedAssetCache = true
         log.info({ id: extensionId }, `Extension connected. Total: ${extensionRegistry.size}`)
       },
       onDisconnected: (extensionId, wasActive) => {
@@ -1895,6 +1907,8 @@ export async function startHub(
         }
       },
       onRuntimeHello: (extension) => {
+        if ((extension.runtime?.protocolVersion ?? 13) < MCP_ASSET_CACHE_PROTOCOL_VERSION)
+          hasUnboundedAssetCache = true
         publishHubRuntimeIdentity()
         log.info(
           {

@@ -255,8 +255,9 @@ When changing the Hub/extension compatibility path or legacy assets:
   The harness rejects Windows before starting a Hub because the fixed named pipe ignores runtime
   directory overrides. Unix socket hook fixtures are also skipped on Windows.
   One of the normal loopback candidate ports must be available. The old receiving schema is
-  frozen from extension 0.20.0 / MCP 0.7.1 and extension 0.22.0 / MCP 0.10.0; do not derive these
-  fixtures from current shared schemas. Every protocol bump must test the released extension's
+  frozen from extension 0.20.0 / MCP 0.7.1 and extension 0.22.0 / MCP 0.10.0, with separate
+  screenshot argument fixtures for protocols 15 and 16; do not derive these fixtures from current
+  shared schemas. Every protocol bump must test the released extension's
   supported calls and rejection of unsupported options against the new Hub in the same change.
 - Keep the broker regression for new-extension/old-Hub rejection and recovery. This deterministic
   transport check does not replace installed-host Queue/Steer/Stop acceptance.

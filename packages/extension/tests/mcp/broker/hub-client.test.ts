@@ -130,7 +130,7 @@ describe('mcp/broker/hub-client', () => {
           ? null
           : {
               type: 'runtimeHello',
-              protocolVersion: 15,
+              protocolVersion: TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION,
               extensionVersion: '1',
               extensionRuntimeFingerprint: 'a'.repeat(64),
               ...(kind === 'foreign'
@@ -159,7 +159,7 @@ describe('mcp/broker/hub-client', () => {
       const sockets: FakeWebSocket[] = []
       const hello: RuntimeHelloMessage = {
         type: 'runtimeHello',
-        protocolVersion: 15,
+        protocolVersion: TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION,
         extensionVersion: '1',
         extensionRuntimeFingerprint: 'a'.repeat(64),
         runtimeProfile: { kind: 'checkout', id: 'a'.repeat(16) }
@@ -173,7 +173,7 @@ describe('mcp/broker/hub-client', () => {
       sockets[0]!.receive({
         type: 'registered',
         id: 'other',
-        protocolVersion: 15,
+        protocolVersion: TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION,
         runtimeProfile: { kind: 'checkout', id: 'b'.repeat(16) }
       })
       await flushMicrotasks()
@@ -185,7 +185,7 @@ describe('mcp/broker/hub-client', () => {
       matched.receive({
         type: 'registered',
         id: 'own',
-        protocolVersion: 15,
+        protocolVersion: TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION,
         runtimeProfile: hello.runtimeProfile,
         ...(receipts ? { terminalReceiptGeneration: 'generation' } : {})
       })
@@ -211,7 +211,7 @@ describe('mcp/broker/hub-client', () => {
       {},
       {
         type: 'runtimeHello',
-        protocolVersion: 15,
+        protocolVersion: TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION,
         extensionVersion: '1',
         extensionRuntimeFingerprint: 'a'.repeat(64),
         runtimeProfile
@@ -224,7 +224,12 @@ describe('mcp/broker/hub-client', () => {
     vi.spyOn(failed, 'send').mockImplementation(() => {
       throw new Error('Socket closed')
     })
-    failed.receive({ type: 'registered', id: 'hub', protocolVersion: 15, runtimeProfile })
+    failed.receive({
+      type: 'registered',
+      id: 'hub',
+      protocolVersion: TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION,
+      runtimeProfile
+    })
     await flushMicrotasks()
     expect(failed.readyState).toBe(3)
     expect(sockets[1]!.url).toBe('ws://127.0.0.1:17431')
@@ -242,7 +247,7 @@ describe('mcp/broker/hub-client', () => {
     sockets[0]!.receive({
       type: 'registered',
       id: 'dev',
-      protocolVersion: 15,
+      protocolVersion: TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION,
       runtimeProfile: { kind: 'checkout', id: 'a'.repeat(16) }
     })
     await flushMicrotasks()
@@ -262,7 +267,7 @@ describe('mcp/broker/hub-client', () => {
       const onKeepalive = vi.fn()
       const hello: RuntimeHelloMessage = {
         type: 'runtimeHello',
-        protocolVersion: 15,
+        protocolVersion: TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION,
         extensionVersion: '1',
         extensionRuntimeFingerprint: 'a'.repeat(64)
       }
@@ -282,7 +287,7 @@ describe('mcp/broker/hub-client', () => {
       socket.receive({
         type: 'registered',
         id: 'gateway',
-        protocolVersion: 15,
+        protocolVersion: TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION,
         terminalReceiptGeneration: 'hub',
         ...(durable ? { durableTerminalReceipts: true } : {})
       })

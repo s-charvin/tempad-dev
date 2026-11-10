@@ -99,6 +99,11 @@ authentication are outside the current protocol; Origin checks must not be descr
 - Uploads enforce per-asset size, reserve aggregate quota before concurrent bodies are accepted, and
   cap concurrent uploads. Server connections and concurrent downloads are capped; HTTP headers,
   header wait time, request/response time, and keep-alive time are bounded.
+  Capacity pressure reclaims the least recently used assets idle for more than one hour, excluding
+  active transfers. Insufficient reclaimable space still rejects the upload; failed file removal
+  retains its catalog entry so those bytes remain charged to the quota.
+  A pre-protocol-17 extension connection disables capacity eviction for that Hub process's lifetime;
+  earlier extension upload caches do not expire and cannot recover evicted references.
 - Current uploads use full lowercase SHA-256 identifiers. The legacy capability alone permits
   8-character SHA-256-prefix uploads for extension 0.20.0. It hashes every upload, including retries,
   and rejects a collision with an existing asset's full content without overwriting it. This does
@@ -108,7 +113,7 @@ authentication are outside the current protocol; Origin checks must not be descr
 - Downloads use attachment disposition, `nosniff`, a restrictive CSP, no referrer, and private cache
   semantics.
 - Stdio tool results may expose an existing asset-store file as `asset.localPath`. The path creates
-  no second copy, remains under the private asset directory and its existing TTL, and is delivered
+  no second copy, remains under the private asset directory and its TTL and capacity eviction, and is delivered
   only to the local MCP consumer alongside the capability URL.
 - Asset responses remain ephemeral and are not exposed as MCP resources.
 

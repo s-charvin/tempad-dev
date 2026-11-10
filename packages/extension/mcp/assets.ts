@@ -1,13 +1,17 @@
 import type { AssetDescriptor, BridgeToPageMessage, PageToBridgeMessage } from '@tempad-dev/shared'
 
-import { MCP_MAX_ASSET_BYTES, TEMPAD_MCP_ERROR_CODES } from '@tempad-dev/shared'
+import {
+  MCP_ASSET_CACHE_GRACE_MS,
+  MCP_MAX_ASSET_BYTES,
+  TEMPAD_MCP_ERROR_CODES
+} from '@tempad-dev/shared'
 
 import { logger } from '@/utils/log'
 
 import { base64ToBytes, digestMatchesAssetHash, sha256Hex } from './encoding'
 import { createCodedError } from './errors'
 
-const uploadedAssets = new Set<string>()
+const uploadedAssets = new Map<string, number>()
 const inflightUploads = new Map<string, Promise<void>>()
 const downloadedAssets = new Map<string, Promise<DownloadedAsset>>()
 let assetCacheGeneration = 0
@@ -96,7 +100,8 @@ export async function ensureAssetUploaded(
   const uploadKey = `${assetServerUrl}::${hash}`
   const generation = assetCacheGeneration
 
-  if (uploadedAssets.has(uploadKey)) {
+  const uploadedAt = uploadedAssets.get(uploadKey)
+  if (uploadedAt !== undefined && Date.now() - uploadedAt < MCP_ASSET_CACHE_GRACE_MS) {
     return descriptor
   }
 
@@ -106,9 +111,10 @@ export async function ensureAssetUploaded(
     return descriptor
   }
 
+  const uploadStartedAt = Date.now()
   const promise = uploadAsset({ bytes, hash, metadata, mimeType })
     .then(() => {
-      if (generation === assetCacheGeneration) uploadedAssets.add(uploadKey)
+      if (generation === assetCacheGeneration) uploadedAssets.set(uploadKey, uploadStartedAt)
       logger.log(`Uploaded asset ${hash.slice(0, 8)} (${mimeType}, ${size} bytes)`)
     })
     .finally(() => {

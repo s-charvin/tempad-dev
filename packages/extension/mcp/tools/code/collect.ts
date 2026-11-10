@@ -102,9 +102,10 @@ export async function collectNodeData(
 
       assertActive()
       if (hasMediaFills(node, cache)) {
-        const imageScaleMode = resolveImageScaleMode(node)
-        if (imageScaleMode) {
-          processed[snapshot.tag === 'img' ? 'object-fit' : 'background-size'] = imageScaleMode
+        const imageSizeProperty = snapshot.tag === 'img' ? 'object-fit' : 'background-size'
+        if (!processed[imageSizeProperty]) {
+          const imageScaleMode = resolveImageScaleMode(node)
+          if (imageScaleMode) processed[imageSizeProperty] = imageScaleMode
         }
 
         const nodeVideoPreviewAssetHashes = new Set<string>()

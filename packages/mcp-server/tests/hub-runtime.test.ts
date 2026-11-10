@@ -161,7 +161,10 @@ async function connectConsumer(
   return { socket, send, reply, replies, bindingUpdates }
 }
 
-function connectExtension(terminalReceipts = false) {
+function connectExtension(
+  terminalReceipts = false,
+  protocolVersion = TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION
+) {
   const calls: ToolCallMessage[] = []
   const peer = Object.assign(new EventEmitter(), {
     protocol: TEMPAD_MCP_BRIDGE_SUBPROTOCOL,
@@ -182,7 +185,7 @@ function connectExtension(terminalReceipts = false) {
   websocket.emit('connection', peer, { headers: { origin: 'chrome-extension://isolated-test' } })
   send({
     type: 'runtimeHello',
-    protocolVersion: TEMPAD_MCP_BRIDGE_PROTOCOL_VERSION,
+    protocolVersion,
     extensionVersion: '0.23.4',
     extensionRuntimeFingerprint: 'a'.repeat(64),
     ...(terminalReceipts ? { terminalReceipts: true } : {})
@@ -217,7 +220,7 @@ function connectExtension(terminalReceipts = false) {
     await vi.waitFor(() => expect(calls.length).toBeGreaterThan(index), { interval: 1 })
     return calls[index]!
   }
-  return { calls, call, send, publishSession, peer }
+  return { calls, call, send, publishSession, peer, disconnect: () => peer.emit('close') }
 }
 
 async function loadRuntime() {
@@ -662,6 +665,20 @@ describe('Hub runtime module', () => {
       }
     }
   )
+
+  it('disables pressure eviction for the Hub lifetime after an older extension connects', async () => {
+    const { startHub } = await loadRuntime()
+    await startHub()
+    const canEvict = vi.mocked(createAssetHttpServer).mock.calls[0]![1]!.canEvictAssets!
+    const current = connectExtension()
+    expect(canEvict()).toBe(true)
+    const older = connectExtension(false, 16)
+    expect(canEvict()).toBe(false)
+    older.disconnect()
+    expect(canEvict()).toBe(false)
+    current.disconnect()
+    expect(canEvict()).toBe(false)
+  })
 
   it('advertises only the supported tools and rejects retired asset/token tool calls', async () => {
     const { startHub } = await loadRuntime()

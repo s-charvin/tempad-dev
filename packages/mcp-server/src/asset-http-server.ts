@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-import { MCP_HASH_HEX_LENGTH } from '@tempad-dev/shared'
+import { MCP_ASSET_CACHE_GRACE_MS, MCP_HASH_HEX_LENGTH } from '@tempad-dev/shared'
 import { nanoid } from 'nanoid'
 import { createHash } from 'node:crypto'
 import {
@@ -48,6 +48,7 @@ export interface AssetHttpServerOptions {
   authorizeExtensionOrigin?: (origin: string) => boolean
   admit?: () => boolean
   onActivity?: () => void
+  canEvictAssets?: () => boolean
 }
 
 export interface AssetHttpServer {
@@ -80,6 +81,55 @@ export function createAssetHttpServer(
   let activeDownloads = 0
   let activeUploads = 0
   let reservedUploadBytes = 0
+  const activeAssetTransfers = new Map<string, number>()
+
+  function retainAsset(hash: string): () => void {
+    activeAssetTransfers.set(hash, (activeAssetTransfers.get(hash) ?? 0) + 1)
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      const remaining = activeAssetTransfers.get(hash)! - 1
+      if (remaining) activeAssetTransfers.set(hash, remaining)
+      else activeAssetTransfers.delete(hash)
+    }
+  }
+
+  function makeRoomForUpload(hash: string, size: number): boolean {
+    const requiredBytes = reservedUploadBytes + size
+    let storedBytes = getStoredAssetBytes(store, hash)
+    if (storedBytes + requiredBytes <= maxAssetStoreBytes) return true
+    if (requiredBytes > maxAssetStoreBytes) return false
+    if (options.canEvictAssets && !options.canEvictAssets()) return false
+
+    const cutoff = Date.now() - MCP_ASSET_CACHE_GRACE_MS
+    const candidates = store
+      .list()
+      .filter(
+        (record) =>
+          record.hash !== hash &&
+          !activeAssetTransfers.has(record.hash) &&
+          Number.isFinite(record.size) &&
+          record.size > 0 &&
+          getLastAccess(record) < cutoff
+      )
+      .sort((a, b) => getLastAccess(a) - getLastAccess(b))
+    // Do not discard useful files for a request that still cannot fit.
+    const reclaimableBytes = candidates.reduce((total, record) => total + record.size, 0)
+    if (storedBytes - reclaimableBytes + requiredBytes > maxAssetStoreBytes) return false
+
+    let removed = 0
+    for (const record of candidates) {
+      store.remove(record.hash)
+      if (!store.get(record.hash)) {
+        storedBytes -= record.size
+        removed += 1
+      }
+      if (storedBytes + requiredBytes <= maxAssetStoreBytes) break
+    }
+    log.info({ removed }, 'Reclaimed idle assets under storage pressure.')
+    return getStoredAssetBytes(store, hash) + requiredBytes <= maxAssetStoreBytes
+  }
 
   async function start(): Promise<void> {
     if (port !== null) return
@@ -248,12 +298,14 @@ export function createAssetHttpServer(
     }
 
     activeDownloads += 1
+    const releaseAsset = retainAsset(hash)
     options.onActivity?.()
     let released = false
     const release = () => {
       if (released) return
       released = true
       activeDownloads -= 1
+      releaseAsset()
       options.onActivity?.()
     }
     res.once('finish', release)
@@ -341,10 +393,7 @@ export function createAssetHttpServer(
     }
 
     const reservationBytes = declaredSize ?? maxAssetSizeBytes
-    if (
-      getStoredAssetBytes(store, hash) + reservedUploadBytes + reservationBytes >
-      maxAssetStoreBytes
-    ) {
+    if (!makeRoomForUpload(hash, reservationBytes)) {
       req.resume()
       sendError(res, 507, 'Asset Store Quota Exceeded')
       return
@@ -357,6 +406,7 @@ export function createAssetHttpServer(
     activeUploads += 1
     options.onActivity?.()
     reservedUploadBytes += reservationBytes
+    const releaseAsset = retainAsset(hash)
 
     const cleanup = () => {
       if (existsSync(tmpPath)) {
@@ -384,6 +434,7 @@ export function createAssetHttpServer(
       activeUploads -= 1
       options.onActivity?.()
       reservedUploadBytes -= reservationBytes
+      releaseAsset()
       if (err) {
         cleanup()
         if (err.message === 'PayloadTooLarge') {
@@ -407,7 +458,7 @@ export function createAssetHttpServer(
         return
       }
 
-      if (getStoredAssetBytes(store, hash) + reservedUploadBytes + size > maxAssetStoreBytes) {
+      if (!makeRoomForUpload(hash, size)) {
         cleanup()
         sendError(res, 507, 'Asset Store Quota Exceeded')
         return
@@ -520,4 +571,8 @@ function getStoredAssetBytes(store: AssetStore, excludeHash?: string): number {
     if (record.hash === excludeHash) return total
     return Number.isFinite(record.size) && record.size > 0 ? total + record.size : total
   }, 0)
+}
+
+function getLastAccess(record: AssetRecord): number {
+  return Number.isFinite(record.lastAccess) ? record.lastAccess : record.uploadedAt
 }

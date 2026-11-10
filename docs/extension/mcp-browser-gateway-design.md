@@ -67,8 +67,9 @@ in compatibility fixtures. A version bump alone does not complete a migration.
 
 ### Protocol 13 transition
 
-The Hub serves released protocol 13 (extension 0.22.0), protocol 15 (extension 0.23.0), and
-current protocol 16, which adds explicit Figma-native `get_screenshot.scale` export multipliers.
+The Hub serves released protocol 13 (extension 0.22.0), protocol 15 (extension 0.23.0), protocol 16
+with explicit Figma-native `get_screenshot.scale` export multipliers, and current protocol 17
+with bounded completed-upload caches for safe capacity eviction.
 Current extensions include `protocolVersion` in `runtimeHello`; a missing field conservatively
 selects protocol 13. Package versions and runtime fingerprints do not select capabilities.
 An unsupported version or a changed runtime identity/protocol on an open connection closes it.
@@ -246,6 +247,14 @@ body, verifies its digest, and returns the bytes through the same validated brid
 fetches the loopback server directly. The asset URL contains a random capability path generated for
 the hub process; the server also enforces per-asset, aggregate-store, concurrent upload, header, and
 request-time limits. It does not emit wildcard CORS.
+
+Completed upload entries expire after `MCP_ASSET_CACHE_GRACE_MS`, matching the Hub's minimum idle
+period for capacity eviction. Reusing an older descriptor reuploads its bytes so an evicted file
+is restored. In-flight uploads remain deduplicated, and tool results renew returned assets' access
+times in the Hub.
+An extension using a protocol earlier than 17 disables capacity eviction for the remainder of
+that Hub process, including after disconnect. Pending runtime handshakes also block eviction.
+This preserves older extensions' permanent upload-cache references without dropping their support.
 
 ## Trust boundary
 

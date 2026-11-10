@@ -12,6 +12,10 @@ import {
 } from './fixtures/extension-0.22.0.mjs'
 import { DesignTaskSchema } from './fixtures/protocol-13-design-task.mjs'
 import { GetScreenshotParametersSchema as Protocol15ScreenshotSchema } from './fixtures/protocol-15-screenshot.mjs'
+import {
+  GetScreenshotParametersSchema as Protocol16ScreenshotSchema,
+  MessageToExtensionSchema as Protocol16Messages
+} from './fixtures/protocol-16-screenshot.mjs'
 
 // Run against the built Hub using the released receiving schemas, not current shared imports.
 export async function checkProtocol13({ port, peer, send, activate, until, call, origin }) {
@@ -229,6 +233,32 @@ export async function checkProtocol13({ port, peer, send, activate, until, call,
     assert.match(JSON.stringify(unsupported), /EXTENSION_UPGRADE_REQUIRED/)
   }
   assert.equal(other.calls.length, protocol15Calls, 'scaled reads must not reach protocol 15')
+  const sixteen = await peer(port, false, Protocol16Messages)
+  assert.ok(sixteen.frames[0].supportedProtocolVersions.includes(16))
+  send(sixteen, {
+    type: 'runtimeHello',
+    protocolVersion: 16,
+    extensionVersion: '0.23.4',
+    extensionRuntimeFingerprint: 'd'.repeat(64)
+  })
+  send(sixteen, {
+    type: 'sessions',
+    browserId: 'browser-16',
+    activeSessionId: 'tab-16',
+    sessions: [{ ...session, sessionId: 'tab-16', fileKey: 'file-16' }]
+  })
+  await activate(sixteen)
+  sixteen.respond = (message) => {
+    assert.equal(message.payload.name, 'get_screenshot')
+    assert.deepEqual(Protocol16ScreenshotSchema.parse(message.payload.args), message.payload.args)
+    return { ...screenshot, scale: message.payload.args.scale ?? 1 }
+  }
+  for (const scale of [1, 3]) {
+    const result = await call('get_screenshot', { sessionId: 'tab-16', nodeId: '1:2', scale })
+    assert.equal(result.isError, undefined, JSON.stringify(result))
+    assert.equal(result.structuredContent.scale, scale)
+    assert.deepEqual(sixteen.calls.at(-1).payload.args, { nodeId: '1:2', scale })
+  }
   const routedCount = released.calls.length
   assert.match(
     JSON.stringify(await call('get_code', { taskId: task.taskId, nodeIds: ['1:2'] })),
@@ -333,7 +363,7 @@ export async function checkProtocol13({ port, peer, send, activate, until, call,
   assert.equal(fenced.isError, true, 'old task lease must not regain authority after reload')
   assert.equal(replacement.calls.length, replacementCalls)
   assert.deepEqual(Buffer.from(await (await globalThis.fetch(asset.url)).arrayBuffer()), bytes)
-  for (const extension of [other, replacement]) {
+  for (const extension of [other, sixteen, replacement]) {
     extension.socket.close()
     await once(extension.socket, 'close')
   }

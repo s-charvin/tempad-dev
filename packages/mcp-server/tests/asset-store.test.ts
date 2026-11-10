@@ -240,6 +240,9 @@ describe('asset-store', () => {
     const store = createAssetStore({ indexPath })
     store.remove('x1')
 
+    expect(store.get('x1')?.size).toBe(1)
+    store.flush()
+    expect(JSON.parse(fsState.contentByPath.get(indexPath)!)).toHaveLength(1)
     expect(log.warn).toHaveBeenCalledWith(
       { hash: 'x1', error: expect.any(Error) },
       'Failed to remove asset file on delete.'
